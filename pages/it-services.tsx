@@ -271,7 +271,7 @@ export default function ITServicesPage() {
 
   const startEdit = (visitor: Visitor) =>{
     setEditingId(visitor.id);
-    setEditCompanions(visitor.companions_inside);
+    setEditCompanions(visitor.accompanying_count);
   };
 
   const cancelEdit = () => {
