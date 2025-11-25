@@ -473,6 +473,7 @@ export default function OrganiserDashboard() {
                         className="input-field text-sm sm:text-base"
                       >
                         <option value="">Select Department</option>
+                        <option value="Computer Science">University Student Council</option>
                         <option value="Computer Science">Computer Science</option>
                         <option value="Commerce">Commerce</option>
                         <option value="Professional Studies">Professional Studies</option>

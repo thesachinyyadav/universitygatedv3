@@ -22,6 +22,8 @@ export default async function handler(
       date_of_visit_to,
       visitor_category,
       purpose,
+      area_of_interest,
+      accompanying_count,
       photo_data
     } = req.body;
 
@@ -168,6 +170,8 @@ export default async function handler(
           date_of_visit_to,
           visitor_category,
           purpose,
+          area_of_interest: JSON.stringify(area_of_interest),
+          accompanying_count: parseInt(accompanying_count) || 0,
           photo_url: photoUrl,
           status: 'approved', // Auto-approved since event is already approved
         },

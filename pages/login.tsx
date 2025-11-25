@@ -26,6 +26,8 @@ export default function Login() {
         return 'Event Organiser';
       case 'cso':
         return 'Chief Security Officer';
+      case 'it_services':
+        return 'IT Services';
       default:
         return 'Staff';
     }
@@ -49,6 +51,12 @@ export default function Login() {
         return (
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        );
+      case 'it_services':
+        return (
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
           </svg>
         );
       default:
@@ -135,6 +143,9 @@ export default function Login() {
             break;
           case 'cso':
             router.push('/cso');
+            break;
+          case 'it_services':
+            router.push('/it-services');
             break;
           default:
             router.push('/');

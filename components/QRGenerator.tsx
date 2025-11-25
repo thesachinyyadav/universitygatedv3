@@ -189,7 +189,7 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
         
         // Category badge
         pdf.setFillColor(colorRGB[0], colorRGB[1], colorRGB[2]);
-        pdf.roundedRect(70, 85, 70, 12, 3, 3, 'F');
+        pdf.rect(70, 85, 70, 12, 'F');
         
         // Category text
         pdf.setTextColor(255, 255, 255);
@@ -208,7 +208,7 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
         
         // Event name - highlighted with background
         pdf.setFillColor(255, 250, 240); // Light beige/cream background
-        pdf.roundedRect(25, 112, 160, 14, 2, 2, 'F');
+        pdf.rect(25, 112, 160, 14, 'F');
         
         // Event name text - larger and bolder
         pdf.setTextColor(37, 74, 154); // Primary blue for emphasis
@@ -243,28 +243,49 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
 
       // QR Code with elegant border
       if (qrCodeUrl) {
-        // Colored border frame
-        if (visitorDetails?.qr_color) {
-          const hexColor = visitorDetails.qr_color.replace('#', '');
-          const r = parseInt(hexColor.substring(0, 2), 16);
-          const g = parseInt(hexColor.substring(2, 4), 16);
-          const b = parseInt(hexColor.substring(4, 6), 16);
+        try {
+          // Colored border frame
+          if (visitorDetails?.qr_color) {
+            const hexColor = visitorDetails.qr_color.replace('#', '');
+            
+            // Validate hex color and parse RGB values
+            if (hexColor.length === 6 && /^[0-9A-Fa-f]{6}$/.test(hexColor)) {
+              const r = parseInt(hexColor.substring(0, 2), 16);
+              const g = parseInt(hexColor.substring(2, 4), 16);
+              const b = parseInt(hexColor.substring(4, 6), 16);
+              
+              // Validate RGB values are valid numbers
+              if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+                // Shadow for 3D effect
+                pdf.setFillColor(220, 220, 220);
+                pdf.rect(52, 148, 107, 107, 'F');
+                
+                // Colored border frame (thicker and more prominent)
+                pdf.setFillColor(r, g, b);
+                pdf.rect(50, 146, 110, 110, 'F');
+                
+                // White background for QR
+                pdf.setFillColor(255, 255, 255);
+                pdf.rect(57, 153, 96, 96, 'F');
+              } else {
+                console.warn('[PDF_DOWNLOAD] Invalid RGB values parsed from color:', hexColor);
+              }
+            } else {
+              console.warn('[PDF_DOWNLOAD] Invalid hex color format:', visitorDetails.qr_color);
+            }
+          }
           
-          // Shadow for 3D effect
-          pdf.setFillColor(220, 220, 220);
-          pdf.roundedRect(52, 148, 107, 107, 5, 5, 'F');
-          
-          // Colored border frame (thicker and more prominent)
-          pdf.setFillColor(r, g, b);
-          pdf.roundedRect(50, 146, 110, 110, 5, 5, 'F');
-          
-          // White background for QR
-          pdf.setFillColor(255, 255, 255);
-          pdf.roundedRect(57, 153, 96, 96, 3, 3, 'F');
+          // QR Code image - centered perfectly
+          console.log('[PDF_DOWNLOAD] Adding QR code image to PDF...');
+          pdf.addImage(qrCodeUrl, 'PNG', 62, 158, 86, 86);
+          console.log('[PDF_DOWNLOAD] ✓ QR code image added successfully');
+        } catch (imgError) {
+          console.error('[PDF_DOWNLOAD] Error adding QR image to PDF:', imgError);
+          // Add a placeholder text if QR code fails
+          pdf.setTextColor(255, 0, 0);
+          pdf.setFontSize(10);
+          pdf.text('QR Code unavailable', 105, 200, { align: 'center' });
         }
-        
-        // QR Code image - centered perfectly
-        pdf.addImage(qrCodeUrl, 'PNG', 62, 158, 86, 86);
       }
 
       // Instructions
@@ -292,13 +313,42 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
       pdf.setFont('helvetica', 'normal');
       pdf.text('Secure • Efficient • Contactless', 105, 290, { align: 'center' });
 
-      // Save PDF
-      const safeEventName = visitorDetails?.event_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Event';
-      pdf.save(`ChristUniversity_AccessPass_${visitorName.replace(/\s+/g, '_')}_${safeEventName}.pdf`);
-      console.log('[PDF_DOWNLOAD] ✓ PDF download initiated successfully');
+      // Save PDF with better error handling
+      try {
+        const safeEventName = visitorDetails?.event_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Event';
+        const fileName = `ChristUniversity_AccessPass_${visitorName.replace(/\s+/g, '_')}_${safeEventName}.pdf`;
+        
+        // Try to save the PDF
+        pdf.save(fileName);
+        console.log('[PDF_DOWNLOAD] ✓ PDF download initiated successfully:', fileName);
+        
+        // Show success message after a brief delay
+        setTimeout(() => {
+          alert('PDF downloaded successfully! Check your Downloads folder.');
+        }, 500);
+      } catch (saveError) {
+        console.error('[PDF_DOWNLOAD] Error saving PDF:', saveError);
+        
+        // Fallback: try to open in new window
+        try {
+          const pdfBlob = pdf.output('blob');
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = `ChristUniversity_AccessPass_${visitorName.replace(/\s+/g, '_')}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+          console.log('[PDF_DOWNLOAD] ✓ PDF downloaded via fallback method');
+        } catch (fallbackError) {
+          console.error('[PDF_DOWNLOAD] Fallback also failed:', fallbackError);
+          throw fallbackError;
+        }
+      }
     } catch (error) {
       console.error('[PDF_DOWNLOAD] Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      alert('Failed to generate PDF. Please try again or check your browser settings.');
     }
   };
 

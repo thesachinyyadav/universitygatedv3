@@ -1,265 +1,478 @@
--- =====================================================
--- CHRIST UNIVERSITY GATED ACCESS MANAGEMENT SYSTEM
--- Complete Database Schema - Production Ready
--- Version 1.0.0
--- Last Updated: October 9, 2025
--- =====================================================
+-- ============================================
+-- CHRIST UNIVERSITY GATED ACCESS SYSTEM
+-- Complete Database Schema for Supabase
+-- Version 2.0.0
+-- Last Updated: November 25, 2025
+-- ============================================
 
--- =====================================================
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================
 -- CLEAN START - Drop existing tables
--- =====================================================
+-- ============================================
+DROP TABLE IF EXISTS system_logs CASCADE;
+DROP TABLE IF EXISTS arrival_log CASCADE;
+DROP TABLE IF EXISTS verification_history CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS visitors CASCADE;
 DROP TABLE IF EXISTS events CASCADE;
 DROP TABLE IF EXISTS event_requests CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
--- =====================================================
--- 1. USERS TABLE
--- Stores all system users (Guards, Organisers, CSO)
--- =====================================================
+-- ============================================
+-- 1. USERS TABLE (Guards, Organisers, CSO, IT Services)
+-- ============================================
 CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  username TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL,
-  role TEXT CHECK(role IN ('guard', 'organiser', 'cso')) NOT NULL,
-  full_name TEXT NOT NULL,
-  department TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL CHECK (role IN ('guard', 'organiser', 'cso', 'it_services')),
+    full_name VARCHAR(255),
+    email VARCHAR(255),
+    phone VARCHAR(20),
+    department VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- =====================================================
--- 2. EVENT REQUESTS TABLE  
--- Organisers submit event requests for CSO approval
--- =====================================================
+-- ============================================
+-- 2. EVENT REQUESTS TABLE
+-- ============================================
 CREATE TABLE event_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organiser_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
-  department TEXT NOT NULL,
-  event_name TEXT NOT NULL,
-  event_description TEXT,
-  date_from DATE NOT NULL,
-  date_to DATE NOT NULL,
-  expected_students INTEGER NOT NULL,
-  max_capacity INTEGER NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')) NOT NULL,
-  rejection_reason TEXT,
-  approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  approved_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    organiser_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    event_name VARCHAR(255) NOT NULL,
+    department VARCHAR(255) NOT NULL,
+    event_description TEXT,
+    date_from DATE NOT NULL,
+    date_to DATE NOT NULL,
+    expected_students INTEGER DEFAULT 0,
+    max_capacity INTEGER NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    rejection_reason TEXT,
+    approved_by UUID REFERENCES users(id),
+    approved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- =====================================================
--- 3. EVENTS TABLE
--- Auto-created when CSO approves event requests
--- =====================================================
+-- ============================================
+-- 3. EVENTS TABLE (Approved Events)
+-- ============================================
 CREATE TABLE events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_request_id UUID REFERENCES event_requests(id) ON DELETE CASCADE,
-  event_name TEXT NOT NULL,
-  department TEXT NOT NULL,
-  organiser_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  date_from DATE NOT NULL,
-  date_to DATE NOT NULL,
-  max_capacity INTEGER NOT NULL,
-  current_registrations INTEGER DEFAULT 0,
-  description TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_request_id UUID REFERENCES event_requests(id) ON DELETE CASCADE,
+    event_name VARCHAR(255) NOT NULL,
+    department VARCHAR(255) NOT NULL,
+    description TEXT,
+    date_from DATE NOT NULL,
+    date_to DATE NOT NULL,
+    max_capacity INTEGER NOT NULL,
+    current_registrations INTEGER DEFAULT 0,
+    total_people INTEGER DEFAULT 0,
+    available_slots INTEGER,
+    status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled', 'approved')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- =====================================================
--- 4. VISITORS TABLE
--- Stores all registered visitors with QR data
--- =====================================================
+-- ============================================
+-- 4. VISITORS TABLE (Main Registration)
+-- ============================================
 CREATE TABLE visitors (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  phone TEXT,
-  email TEXT,
-  event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
-  event_name TEXT NOT NULL,
-  date_of_visit_from DATE NOT NULL,
-  date_of_visit_to DATE NOT NULL,
-  purpose TEXT,
-  visitor_category TEXT DEFAULT 'student' CHECK(visitor_category IN ('student', 'speaker', 'vip')) NOT NULL,
-  qr_color TEXT DEFAULT '#1e40af',
-  status TEXT DEFAULT 'approved' CHECK(status IN ('approved', 'revoked')) NOT NULL,
-  photo_url TEXT,
-  register_number TEXT,
-  verified_at TIMESTAMP WITH TIME ZONE,
-  verified_by TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(20),
+    register_number VARCHAR(100),
+    event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+    event_name VARCHAR(255) NOT NULL,
+    visitor_category VARCHAR(50) DEFAULT 'student' CHECK (visitor_category IN ('student', 'speaker', 'vip')),
+    qr_color VARCHAR(50) DEFAULT 'blue',
+    qr_code TEXT UNIQUE,
+    purpose TEXT,
+    area_of_interest JSONB,
+    photo_url TEXT,
+    
+    -- Companion tracking
+    accompanying_count INTEGER DEFAULT 0,
+    companions_inside INTEGER DEFAULT 0,
+    
+    -- Visit dates
+    date_of_visit_from DATE NOT NULL,
+    date_of_visit_to DATE NOT NULL,
+    
+    -- Status tracking
+    status VARCHAR(50) DEFAULT 'approved' CHECK (status IN ('pending', 'approved', 'revoked')),
+    
+    -- Arrival tracking (NEW)
+    has_arrived BOOLEAN DEFAULT FALSE,
+    arrived_at TIMESTAMP WITH TIME ZONE,
+    checked_in_by UUID REFERENCES users(id),
+    
+    -- Verification tracking
+    verified_by UUID REFERENCES users(id),
+    verified_at TIMESTAMP WITH TIME ZONE,
+    verification_count INTEGER DEFAULT 0,
+    last_verified_at TIMESTAMP WITH TIME ZONE,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- =====================================================
--- 5. NOTIFICATIONS TABLE
--- CSO receives notifications for new event requests
--- =====================================================
+-- ============================================
+-- 5. VERIFICATION HISTORY TABLE
+-- ============================================
+CREATE TABLE verification_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    visitor_id UUID REFERENCES visitors(id) ON DELETE CASCADE,
+    verified_by UUID REFERENCES users(id),
+    verified_by_name VARCHAR(255),
+    verified_by_role VARCHAR(50),
+    verification_type VARCHAR(50) DEFAULT 'qr_scan' CHECK (verification_type IN ('qr_scan', 'manual_entry', 'it_services_checkin')),
+    verification_status VARCHAR(50) CHECK (verification_status IN ('success', 'denied')),
+    denial_reason TEXT,
+    visitor_details JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 6. ARRIVAL LOG TABLE (NEW - Track Entry/Exit)
+-- ============================================
+CREATE TABLE arrival_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    visitor_id UUID REFERENCES visitors(id) ON DELETE CASCADE,
+    visitor_name VARCHAR(255) NOT NULL,
+    event_name VARCHAR(255) NOT NULL,
+    
+    -- Arrival details
+    action_type VARCHAR(50) NOT NULL CHECK (action_type IN ('check_in', 'check_out', 'companion_update')),
+    previous_companion_count INTEGER,
+    new_companion_count INTEGER,
+    companions_inside INTEGER,
+    
+    -- Staff tracking
+    processed_by UUID REFERENCES users(id),
+    processed_by_name VARCHAR(255),
+    notes TEXT,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 7. NOTIFICATIONS TABLE
+-- ============================================
 CREATE TABLE notifications (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
-  type TEXT CHECK(type IN ('event_request', 'system')) NOT NULL,
-  title TEXT NOT NULL,
-  message TEXT NOT NULL,
-  related_id UUID,
-  is_read BOOLEAN DEFAULT false,
-  created_at TIMESTAMP DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) DEFAULT 'info' CHECK (type IN ('info', 'warning', 'success', 'error', 'event_request', 'system')),
+    related_id UUID,
+    related_type VARCHAR(50),
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- =====================================================
--- INDEXES for Performance Optimization
--- =====================================================
+-- ============================================
+-- 8. SYSTEM LOGS TABLE (Audit Trail)
+-- ============================================
+CREATE TABLE system_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id),
+    action VARCHAR(255) NOT NULL,
+    entity_type VARCHAR(100),
+    entity_id UUID,
+    details JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- INDEXES FOR PERFORMANCE
+-- ============================================
+
+-- Users
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_username ON users(username);
+
+-- Event Requests
 CREATE INDEX idx_event_requests_status ON event_requests(status);
 CREATE INDEX idx_event_requests_organiser ON event_requests(organiser_id);
-CREATE INDEX idx_events_date ON events(date_from, date_to);
-CREATE INDEX idx_events_capacity ON events(current_registrations, max_capacity);
-CREATE INDEX idx_visitors_event ON visitors(event_id);
-CREATE INDEX idx_visitors_category ON visitors(visitor_category);
-CREATE INDEX idx_visitors_status ON visitors(status);
-CREATE INDEX idx_visitors_register_number ON visitors(register_number);
-CREATE INDEX idx_visitors_verified_by ON visitors(verified_by);
-CREATE INDEX idx_visitors_verified_at ON visitors(verified_at);
-CREATE INDEX idx_notifications_user ON notifications(user_id, is_read);
+CREATE INDEX idx_event_requests_dates ON event_requests(date_from, date_to);
 
--- =====================================================
--- ROW LEVEL SECURITY POLICIES
--- Enable RLS for all tables
--- =====================================================
+-- Events
+CREATE INDEX idx_events_status ON events(status);
+CREATE INDEX idx_events_dates ON events(date_from, date_to);
+
+-- Visitors
+CREATE INDEX idx_visitors_event ON visitors(event_id);
+CREATE INDEX idx_visitors_status ON visitors(status);
+CREATE INDEX idx_visitors_qr ON visitors(qr_code);
+CREATE INDEX idx_visitors_category ON visitors(visitor_category);
+CREATE INDEX idx_visitors_has_arrived ON visitors(has_arrived);
+CREATE INDEX idx_visitors_name ON visitors(name);
+CREATE INDEX idx_visitors_phone ON visitors(phone);
+CREATE INDEX idx_visitors_dates ON visitors(date_of_visit_from, date_of_visit_to);
+CREATE INDEX idx_visitors_area_of_interest ON visitors USING GIN (area_of_interest);
+
+-- Verification History
+CREATE INDEX idx_verification_visitor ON verification_history(visitor_id);
+CREATE INDEX idx_verification_by ON verification_history(verified_by);
+CREATE INDEX idx_verification_date ON verification_history(created_at);
+
+-- Arrival Log
+CREATE INDEX idx_arrival_visitor ON arrival_log(visitor_id);
+CREATE INDEX idx_arrival_processed_by ON arrival_log(processed_by);
+CREATE INDEX idx_arrival_date ON arrival_log(created_at);
+CREATE INDEX idx_arrival_action ON arrival_log(action_type);
+
+-- Notifications
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_read ON notifications(is_read);
+
+-- System Logs
+CREATE INDEX idx_system_logs_user ON system_logs(user_id);
+CREATE INDEX idx_system_logs_date ON system_logs(created_at);
+
+-- ============================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- ============================================
+
+-- Enable RLS on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE event_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE visitors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE verification_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE arrival_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_logs ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations (configure stricter policies as needed)
 CREATE POLICY "Allow all on users" ON users FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on event_requests" ON event_requests FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on events" ON events FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on visitors" ON visitors FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on verification_history" ON verification_history FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on arrival_log" ON arrival_log FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on notifications" ON notifications FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on system_logs" ON system_logs FOR ALL USING (true) WITH CHECK (true);
 
--- =====================================================
--- TRIGGER FUNCTIONS
--- =====================================================
+-- ============================================
+-- TRIGGERS
+-- ============================================
 
--- Function 1: Notify CSO when event request is submitted
-CREATE OR REPLACE FUNCTION notify_cso_on_event_request()
+-- 1. Auto-update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
-DECLARE
-  cso_user_id UUID;
 BEGIN
-  FOR cso_user_id IN SELECT id FROM users WHERE role = 'cso' LOOP
-    INSERT INTO notifications (user_id, type, title, message, related_id)
-    VALUES (
-      cso_user_id,
-      'event_request',
-      'New Event Request',
-      'New event request from ' || NEW.department || ' for ' || NEW.event_name,
-      NEW.id
-    );
-  END LOOP;
-  RETURN NEW;
+    NEW.updated_at = NOW();
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Function 2: Auto-create event when request is approved
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_event_requests_updated_at BEFORE UPDATE ON event_requests
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_visitors_updated_at BEFORE UPDATE ON visitors
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- 2. Assign QR color based on visitor category
+CREATE OR REPLACE FUNCTION assign_qr_color()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.visitor_category = 'student' THEN
+        NEW.qr_color := 'blue';
+    ELSIF NEW.visitor_category = 'speaker' THEN
+        NEW.qr_color := 'amber';
+    ELSIF NEW.visitor_category = 'vip' THEN
+        NEW.qr_color := 'maroon';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_qr_color BEFORE INSERT OR UPDATE ON visitors
+    FOR EACH ROW EXECUTE FUNCTION assign_qr_color();
+
+-- 3. Create event when request is approved
 CREATE OR REPLACE FUNCTION create_event_on_approval()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.status = 'approved' AND (OLD.status IS NULL OR OLD.status != 'approved') THEN
-    INSERT INTO events (
-      event_request_id,
-      event_name,
-      department,
-      organiser_id,
-      date_from,
-      date_to,
-      max_capacity,
-      description
-    ) VALUES (
-      NEW.id,
-      NEW.event_name,
-      NEW.department,
-      NEW.organiser_id,
-      NEW.date_from,
-      NEW.date_to,
-      NEW.max_capacity,
-      NEW.event_description
-    );
+    IF NEW.status = 'approved' AND OLD.status = 'pending' THEN
+        INSERT INTO events (
+            event_request_id,
+            event_name,
+            department,
+            description,
+            date_from,
+            date_to,
+            max_capacity,
+            total_people,
+            available_slots,
+            status
+        ) VALUES (
+            NEW.id,
+            NEW.event_name,
+            NEW.department,
+            NEW.event_description,
+            NEW.date_from,
+            NEW.date_to,
+            NEW.max_capacity,
+            0,
+            NEW.max_capacity,
+            'approved'
+        );
+        
+        -- Notify organiser
+        INSERT INTO notifications (user_id, title, message, type, related_id, related_type)
+        VALUES (NEW.organiser_id, 'Event Approved', 'Your event "' || NEW.event_name || '" has been approved', 'success', NEW.id, 'event_request');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER create_event_trigger AFTER UPDATE ON event_requests
+    FOR EACH ROW EXECUTE FUNCTION create_event_on_approval();
+
+-- 4. Update event registration count and available slots
+CREATE OR REPLACE FUNCTION update_event_registrations()
+RETURNS TRIGGER AS $$
+DECLARE
+    visitor_total INTEGER;
+BEGIN
+    -- Calculate total people for this visitor (1 visitor + companions)
+    visitor_total := 1 + COALESCE(NEW.accompanying_count, 0);
     
-    NEW.approved_at := NOW();
-  END IF;
-  RETURN NEW;
+    UPDATE events
+    SET 
+        current_registrations = current_registrations + 1,
+        total_people = total_people + visitor_total,
+        available_slots = max_capacity - (total_people + visitor_total)
+    WHERE id = NEW.event_id;
+    
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Function 3: Increment event registrations count
-CREATE OR REPLACE FUNCTION increment_event_registrations()
+CREATE TRIGGER increment_event_registrations AFTER INSERT ON visitors
+    FOR EACH ROW EXECUTE FUNCTION update_event_registrations();
+
+-- 5. Log arrival updates
+CREATE OR REPLACE FUNCTION log_arrival_changes()
 RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE events 
-  SET current_registrations = current_registrations + 1
-  WHERE id = NEW.event_id;
-  RETURN NEW;
+    -- Log check-in
+    IF NEW.has_arrived = TRUE AND OLD.has_arrived = FALSE THEN
+        INSERT INTO arrival_log (
+            visitor_id,
+            visitor_name,
+            event_name,
+            action_type,
+            companions_inside,
+            processed_by,
+            created_at
+        ) VALUES (
+            NEW.id,
+            NEW.name,
+            NEW.event_name,
+            'check_in',
+            NEW.companions_inside,
+            NEW.checked_in_by,
+            NOW()
+        );
+    END IF;
+    
+    -- Log companion count updates
+    IF NEW.accompanying_count != OLD.accompanying_count OR NEW.companions_inside != OLD.companions_inside THEN
+        INSERT INTO arrival_log (
+            visitor_id,
+            visitor_name,
+            event_name,
+            action_type,
+            previous_companion_count,
+            new_companion_count,
+            companions_inside,
+            processed_by,
+            created_at
+        ) VALUES (
+            NEW.id,
+            NEW.name,
+            NEW.event_name,
+            'companion_update',
+            OLD.accompanying_count,
+            NEW.accompanying_count,
+            NEW.companions_inside,
+            NEW.checked_in_by,
+            NOW()
+        );
+    END IF;
+    
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Function 4: Set QR color based on visitor category
-CREATE OR REPLACE FUNCTION set_qr_color()
+CREATE TRIGGER log_arrival_trigger AFTER UPDATE ON visitors
+    FOR EACH ROW EXECUTE FUNCTION log_arrival_changes();
+
+-- 6. Notify CSO of new event requests
+CREATE OR REPLACE FUNCTION notify_cso_new_request()
 RETURNS TRIGGER AS $$
 BEGIN
-  CASE NEW.visitor_category
-    WHEN 'student' THEN NEW.qr_color := '#092987';   -- Deep Blue
-    WHEN 'speaker' THEN NEW.qr_color := '#d97706';   -- Amber
-    WHEN 'vip' THEN NEW.qr_color := '#991b1b';       -- Maroon
-    ELSE NEW.qr_color := '#092987';
-  END CASE;
-  RETURN NEW;
+    INSERT INTO notifications (user_id, title, message, type, related_id, related_type)
+    SELECT id, 'New Event Request', 'New event request: "' || NEW.event_name || '" from ' || NEW.department, 'info', NEW.id, 'event_request'
+    FROM users WHERE role = 'cso';
+    
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- =====================================================
--- TRIGGERS
--- =====================================================
-
--- Trigger 1: Notify CSO on new event request
-CREATE TRIGGER trigger_notify_cso
-AFTER INSERT ON event_requests
-FOR EACH ROW
-EXECUTE FUNCTION notify_cso_on_event_request();
-
--- Trigger 2: Create event when request approved
-CREATE TRIGGER trigger_create_event
-BEFORE UPDATE ON event_requests
-FOR EACH ROW
-EXECUTE FUNCTION create_event_on_approval();
-
--- Trigger 3: Increment event registration count
-CREATE TRIGGER trigger_increment_registrations
-AFTER INSERT ON visitors
-FOR EACH ROW
-EXECUTE FUNCTION increment_event_registrations();
-
--- Trigger 4: Set QR color on visitor insert
-CREATE TRIGGER trigger_set_qr_color
-BEFORE INSERT OR UPDATE ON visitors
-FOR EACH ROW
-EXECUTE FUNCTION set_qr_color();
+CREATE TRIGGER notify_cso_trigger AFTER INSERT ON event_requests
+    FOR EACH ROW EXECUTE FUNCTION notify_cso_new_request();
 
 -- =====================================================
--- INITIAL ADMIN USERS
--- ⚠️ IMPORTANT: Change these passwords in production!
+-- SEED DATA - USERS
+-- ⚠️ NOTE: Passwords are plain text for initial setup
+-- Production systems should implement password hashing
 -- =====================================================
 
-INSERT INTO users (username, password, role, full_name, department) VALUES
-  ('cso_admin', 'CHANGE_THIS_PASSWORD', 'cso', 'Chief Security Officer', 'Security'),
-  ('guard1', 'CHANGE_THIS_PASSWORD', 'guard', 'Security Guard 1', 'Security'),
-  ('organiser1', 'CHANGE_THIS_PASSWORD', 'organiser', 'Event Organiser', 'Cultural Department');
+-- Master User (SACHIN)
+INSERT INTO users (username, password, role, full_name, department, email, phone) VALUES
+  ('2341551', '34864261', 'cso', 'SACHIN', 'Central Security Office', 'sachin@christuniversity.in', NULL);
+
+-- Guard Users
+INSERT INTO users (username, password, role, full_name, department, email, phone) VALUES
+  ('guard1', 'Christ@2025', 'guard', 'Security Guard 1', 'Security', 'guard1@christuniversity.in', NULL),
+  ('guard2', 'Christ@2025', 'guard', 'Security Guard 2', 'Security', 'guard2@christuniversity.in', NULL);
+
+-- Organiser Users
+INSERT INTO users (username, password, role, full_name, department, email, phone) VALUES
+  ('org1', 'Christ@2025', 'organiser', 'Event Organiser 1', 'Cultural Department', 'org1@christuniversity.in', NULL),
+  ('org2', 'Christ@2025', 'organiser', 'Event Organiser 2', 'Sports Department', 'org2@christuniversity.in', NULL);
+
+-- CSO Users
+INSERT INTO users (username, password, role, full_name, department, email, phone) VALUES
+  ('cso1', 'Christ@2025', 'cso', 'CSO Officer 1', 'Central Security Office', 'cso1@christuniversity.in', NULL),
+  ('cso2', 'Christ@2025', 'cso', 'CSO Officer 2', 'Central Security Office', 'cso2@christuniversity.in', NULL);
+
+-- IT Services Users
+INSERT INTO users (username, password, role, full_name, department, email, phone) VALUES
+  ('it1', 'Christ@2025', 'it_services', 'IT Services 1', 'IT Department', 'it1@christuniversity.in', NULL),
+  ('it2', 'Christ@2025', 'it_services', 'IT Services 2', 'IT Department', 'it2@christuniversity.in', NULL),
+  ('manoj.t', 'Manoj@2025', 'it_services', 'Manoj T', 'IT Department', 'manoj.t@christuniversity.in', NULL);
 
 -- =====================================================
--- SAMPLE DATA (Optional - Remove in Production)
+-- SAMPLE DATA - EVENT REQUESTS & EVENTS
+-- (Optional - for testing purposes)
 -- =====================================================
 
 -- Sample Event Request (Pending)
@@ -274,10 +487,10 @@ INSERT INTO event_requests (
   max_capacity,
   status
 ) VALUES (
-  (SELECT id FROM users WHERE username = 'organiser1' LIMIT 1),
+  (SELECT id FROM users WHERE username = 'org1' LIMIT 1),
   'Cultural Department',
   'Annual Tech Fest 2025',
-  'Three-day technology and innovation festival',
+  'Three-day technology and innovation festival featuring workshops, competitions, and exhibitions',
   CURRENT_DATE + INTERVAL '30 days',
   CURRENT_DATE + INTERVAL '32 days',
   300,
@@ -285,7 +498,7 @@ INSERT INTO event_requests (
   'pending'
 );
 
--- Sample Event Request (Approved) - Will auto-create event
+-- Sample Event Request (Approved) - Will auto-create event via trigger
 INSERT INTO event_requests (
   organiser_id, 
   department, 
@@ -298,27 +511,260 @@ INSERT INTO event_requests (
   status,
   approved_by
 ) VALUES (
-  (SELECT id FROM users WHERE username = 'organiser1' LIMIT 1),
+  (SELECT id FROM users WHERE username = 'org2' LIMIT 1),
   'Sports Department',
   'Sports Day 2025',
-  'Annual inter-departmental sports competition',
+  'Annual inter-departmental sports competition with athletics, team games, and cultural performances',
   CURRENT_DATE + INTERVAL '15 days',
   CURRENT_DATE + INTERVAL '17 days',
   200,
   250,
   'approved',
-  (SELECT id FROM users WHERE username = 'cso_admin' LIMIT 1)
+  (SELECT id FROM users WHERE username = '2341551' LIMIT 1)
 );
+
+-- Sample Event (Manually created for testing IT Services check-in)
+INSERT INTO events (
+  event_request_id,
+  event_name,
+  department,
+  description,
+  date_from,
+  date_to,
+  max_capacity,
+  current_registrations,
+  total_people,
+  available_slots,
+  status
+) VALUES (
+  NULL,
+  'Guest Lecture Series',
+  'Computer Science Department',
+  'Weekly guest lecture series by industry experts',
+  CURRENT_DATE,
+  CURRENT_DATE + INTERVAL '90 days',
+  100,
+  0,
+  0,
+  100,
+  'approved'
+);
+
+-- =====================================================
+-- VIEWS FOR ANALYTICS
+-- =====================================================
+
+-- View: Daily Arrival Statistics
+CREATE OR REPLACE VIEW daily_arrivals AS
+SELECT 
+    DATE(created_at) as visit_date,
+    event_name,
+    COUNT(*) as total_registered,
+    COUNT(CASE WHEN has_arrived = true THEN 1 END) as total_arrived,
+    SUM(accompanying_count) as total_companions_registered,
+    SUM(companions_inside) as total_companions_arrived,
+    COUNT(*) + SUM(accompanying_count) as total_people_registered,
+    COUNT(CASE WHEN has_arrived = true THEN 1 END) + SUM(companions_inside) as total_people_arrived,
+    ROUND(
+        (COUNT(CASE WHEN has_arrived = true THEN 1 END)::NUMERIC / NULLIF(COUNT(*), 0)) * 100, 
+        2
+    ) as arrival_percentage
+FROM visitors
+GROUP BY DATE(created_at), event_name
+ORDER BY visit_date DESC;
+
+-- View: Visitor Statistics by Category
+CREATE OR REPLACE VIEW visitor_statistics AS
+SELECT 
+    visitor_category,
+    COUNT(*) as total_visitors,
+    COUNT(CASE WHEN has_arrived = true THEN 1 END) as arrived_count,
+    COUNT(CASE WHEN verified_at IS NOT NULL THEN 1 END) as verified_count,
+    SUM(accompanying_count) as total_companions_registered,
+    SUM(companions_inside) as total_companions_arrived,
+    AVG(verification_count) as avg_verification_count,
+    COUNT(CASE WHEN has_arrived = true THEN 1 END)::NUMERIC / NULLIF(COUNT(*), 0) * 100 as arrival_rate
+FROM visitors
+GROUP BY visitor_category
+ORDER BY total_visitors DESC;
+
+-- View: Event Capacity and Arrival Tracking
+CREATE OR REPLACE VIEW event_capacity_status AS
+SELECT 
+    e.id,
+    e.event_name,
+    e.department,
+    e.date_from,
+    e.date_to,
+    e.max_capacity,
+    e.current_registrations as registered_visitors,
+    e.total_people as total_registered_people,
+    (SELECT COUNT(*) FROM visitors v WHERE v.event_id = e.id AND v.has_arrived = true) as arrived_visitors,
+    (SELECT COUNT(*) + COALESCE(SUM(companions_inside), 0) 
+     FROM visitors v WHERE v.event_id = e.id AND v.has_arrived = true) as total_people_arrived,
+    e.max_capacity - e.total_people as slots_available,
+    ROUND((e.total_people::NUMERIC / e.max_capacity * 100), 2) as capacity_percentage,
+    e.status
+FROM events e
+WHERE e.status = 'approved'
+ORDER BY e.date_from;
+
+-- View: Recent Verifications
+CREATE OR REPLACE VIEW recent_verifications AS
+SELECT 
+    vh.id,
+    vh.visitor_id,
+    v.name as visitor_name,
+    v.event_name,
+    vh.verified_by,
+    vh.verified_by_name,
+    vh.verified_by_role,
+    vh.verification_type,
+    vh.verification_status,
+    vh.created_at
+FROM verification_history vh
+LEFT JOIN visitors v ON vh.visitor_id = v.id
+ORDER BY vh.created_at DESC
+LIMIT 100;
+
+-- =====================================================
+-- HELPER FUNCTIONS
+-- =====================================================
+
+-- Function: Get Visitor Analytics for a specific date range
+CREATE OR REPLACE FUNCTION get_visitor_analytics(
+    start_date DATE DEFAULT CURRENT_DATE - INTERVAL '7 days',
+    end_date DATE DEFAULT CURRENT_DATE
+)
+RETURNS TABLE (
+    total_registered BIGINT,
+    total_arrived BIGINT,
+    total_companions_reg BIGINT,
+    total_companions_arr BIGINT,
+    arrival_rate NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        COUNT(*)::BIGINT as total_registered,
+        COUNT(CASE WHEN has_arrived = true THEN 1 END)::BIGINT as total_arrived,
+        COALESCE(SUM(accompanying_count), 0)::BIGINT as total_companions_reg,
+        COALESCE(SUM(companions_inside), 0)::BIGINT as total_companions_arr,
+        ROUND(
+            (COUNT(CASE WHEN has_arrived = true THEN 1 END)::NUMERIC / NULLIF(COUNT(*), 0)) * 100,
+            2
+        ) as arrival_rate
+    FROM visitors
+    WHERE created_at::DATE BETWEEN start_date AND end_date;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function: Search Visitors by Name or Phone
+CREATE OR REPLACE FUNCTION search_visitors(
+    search_term TEXT,
+    limit_count INT DEFAULT 10
+)
+RETURNS TABLE (
+    id UUID,
+    name VARCHAR,
+    phone VARCHAR,
+    email VARCHAR,
+    visitor_category VARCHAR,
+    event_name VARCHAR,
+    has_arrived BOOLEAN,
+    companions_inside INT,
+    created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        v.id,
+        v.name,
+        v.phone,
+        v.email,
+        v.visitor_category,
+        v.event_name,
+        v.has_arrived,
+        v.companions_inside,
+        v.created_at
+    FROM visitors v
+    WHERE 
+        v.name ILIKE '%' || search_term || '%'
+        OR v.phone ILIKE '%' || search_term || '%'
+        OR v.email ILIKE '%' || search_term || '%'
+    ORDER BY v.created_at DESC
+    LIMIT limit_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function: Get Event Arrival Summary
+CREATE OR REPLACE FUNCTION get_event_arrival_summary(event_id_param UUID)
+RETURNS TABLE (
+    event_name VARCHAR,
+    total_registered BIGINT,
+    total_arrived BIGINT,
+    companions_registered BIGINT,
+    companions_arrived BIGINT,
+    pending_arrivals BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        v.event_name,
+        COUNT(*)::BIGINT as total_registered,
+        COUNT(CASE WHEN v.has_arrived = true THEN 1 END)::BIGINT as total_arrived,
+        COALESCE(SUM(v.accompanying_count), 0)::BIGINT as companions_registered,
+        COALESCE(SUM(v.companions_inside), 0)::BIGINT as companions_arrived,
+        COUNT(CASE WHEN v.has_arrived = false THEN 1 END)::BIGINT as pending_arrivals
+    FROM visitors v
+    WHERE v.event_id = event_id_param
+    GROUP BY v.event_name;
+END;
+$$ LANGUAGE plpgsql;
 
 -- =====================================================
 -- COLUMN COMMENTS
 -- =====================================================
 
--- Add comments to visitor tracking columns
+-- Users table comments
+COMMENT ON COLUMN users.role IS 'User role: guard, organiser, cso, or it_services';
+COMMENT ON COLUMN users.email IS 'Email address for notifications and communication';
+COMMENT ON COLUMN users.phone IS 'Contact phone number';
+
+-- Visitors table comments
 COMMENT ON COLUMN visitors.photo_url IS 'URL of the visitor photo stored in Supabase storage';
 COMMENT ON COLUMN visitors.register_number IS 'University register/ID number of the visitor';
 COMMENT ON COLUMN visitors.verified_by IS 'Username of the guard who verified this visitor';
 COMMENT ON COLUMN visitors.verified_at IS 'Timestamp when the visitor was verified by guard';
+COMMENT ON COLUMN visitors.accompanying_count IS 'Number of companions registered during visitor registration';
+COMMENT ON COLUMN visitors.companions_inside IS 'Actual number of companions who arrived and checked in';
+COMMENT ON COLUMN visitors.has_arrived IS 'Boolean flag indicating if visitor has physically arrived and been checked in';
+COMMENT ON COLUMN visitors.arrived_at IS 'Timestamp when visitor was checked in at the counter';
+COMMENT ON COLUMN visitors.checked_in_by IS 'Username of IT Services staff who checked in this visitor';
+COMMENT ON COLUMN visitors.verification_count IS 'Number of times this QR code has been scanned/verified';
+COMMENT ON COLUMN visitors.last_verified_at IS 'Timestamp of the most recent QR verification';
+COMMENT ON COLUMN visitors.area_of_interest IS 'JSONB array of visitor interests/specializations - supports multiple selections';
+
+-- Events table comments
+COMMENT ON COLUMN events.current_registrations IS 'Count of visitors registered (not including companions)';
+COMMENT ON COLUMN events.total_people IS 'Total count of all people (visitors + all companions)';
+COMMENT ON COLUMN events.available_slots IS 'Calculated available capacity (max_capacity - total_people)';
+
+-- Verification History table comments
+COMMENT ON TABLE verification_history IS 'Audit log of all QR code scans and verifications';
+COMMENT ON COLUMN verification_history.verification_type IS 'Type of verification: qr_scan, manual_entry, it_services_checkin';
+COMMENT ON COLUMN verification_history.visitor_details IS 'JSONB field for additional verification metadata';
+
+-- Arrival Log table comments
+COMMENT ON TABLE arrival_log IS 'Tracks check-in, check-out, and companion count changes at IT Services counter';
+COMMENT ON COLUMN arrival_log.action_type IS 'Action type: check_in, check_out, companion_update';
+COMMENT ON COLUMN arrival_log.previous_companion_count IS 'Previous companion count before update';
+COMMENT ON COLUMN arrival_log.new_companion_count IS 'New companion count after update';
+
+-- System Logs table comments
+COMMENT ON TABLE system_logs IS 'System-wide audit trail for all critical actions and events';
+COMMENT ON COLUMN system_logs.action IS 'Type of system action performed';
+COMMENT ON COLUMN system_logs.details IS 'JSONB field containing detailed action metadata';
 
 -- =====================================================
 -- STORAGE BUCKET FOR VISITOR PHOTOS

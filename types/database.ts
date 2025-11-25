@@ -1,4 +1,4 @@
-export type UserRole = 'visitor' | 'guard' | 'organiser' | 'cso';
+export type UserRole = 'visitor' | 'guard' | 'organiser' | 'cso' | 'it_services';
 export type VisitorStatus = 'pending' | 'approved' | 'revoked';
 export type VisitorCategory = 'student' | 'speaker' | 'vip';
 export type EventStatus = 'pending' | 'approved' | 'rejected';

@@ -4,22 +4,33 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import type { UserRole } from '@/types/database';
 
-export default function Navbar() {
+interface NavbarProps {
+  role?: UserRole;
+}
+
+export default function Navbar({ role }: NavbarProps = {}) {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(role || null);
   const [showLoginDropdown, setShowLoginDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in
+    // If role prop is provided, use it
+    if (role) {
+      setIsLoggedIn(true);
+      setUserRole(role);
+      return;
+    }
+
+    // Otherwise check localStorage
     const userData = localStorage.getItem('user');
     if (userData) {
       const user = JSON.parse(userData);
       setIsLoggedIn(true);
       setUserRole(user.role);
     }
-  }, [router.pathname]);
+  }, [router.pathname, role]);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -37,6 +48,8 @@ export default function Navbar() {
         return '/organiser';
       case 'cso':
         return '/cso';
+      case 'it_services':
+        return '/it-services';
       default:
         return '/';
     }
@@ -144,6 +157,16 @@ export default function Navbar() {
                       </svg>
                       <span>Chief Security Officer</span>
                     </Link>
+                    <Link
+                      href="/login?role=it_services"
+                      className="block px-4 py-3 hover:bg-primary-50 transition flex items-center space-x-3"
+                      onClick={() => setShowLoginDropdown(false)}
+                    >
+                      <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>IT Services</span>
+                    </Link>
                   </div>
                 )}
               </div>
@@ -236,6 +259,16 @@ export default function Navbar() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
                   <span>Chief Security Officer</span>
+                </Link>
+                <Link
+                  href="/login?role=it_services"
+                  className="block w-full px-4 py-3 hover:bg-primary-700 rounded-lg transition flex items-center space-x-3"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>IT Services</span>
                 </Link>
               </div>
             )}

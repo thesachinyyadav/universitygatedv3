@@ -21,7 +21,7 @@ export default async function handler(
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    if (role && !['guard', 'organiser', 'cso', 'visitor'].includes(role)) {
+    if (role && !['guard', 'organiser', 'cso', 'visitor', 'it_services'].includes(role)) {
       console.log('[LOGIN] Invalid role:', role);
       return res.status(400).json({ error: 'Invalid role' });
     }

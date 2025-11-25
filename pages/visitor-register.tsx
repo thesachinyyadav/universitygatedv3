@@ -27,13 +27,15 @@ export default function VisitorRegister() {
     event_id: '',
     visitor_category: 'student',
     purpose: '',
-    area_of_interest: '',
+    area_of_interest: [] as string[],
     accompanying_count: '0',
   });
   const [capturedPhoto, setCapturedPhoto] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registeredVisitor, setRegisteredVisitor] = useState<any>(null);
   const [error, setError] = useState('');
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
 
   useEffect(() => {
     fetchApprovedEvents();
@@ -58,13 +60,49 @@ export default function VisitorRegister() {
     });
   };
 
+  const handleCheckboxChange = (value: string) => {
+    setFormData((prev) => {
+      const currentInterests = prev.area_of_interest;
+      if (currentInterests.includes(value)) {
+        // Remove if already selected
+        return {
+          ...prev,
+          area_of_interest: currentInterests.filter((item) => item !== value),
+        };
+      } else {
+        // Add if not selected
+        return {
+          ...prev,
+          area_of_interest: [...currentInterests, value],
+        };
+      }
+    });
+  };
+
+  const handleAccompanyingCountBlur = () => {
+    const accompanyingCount = parseInt(formData.accompanying_count);
+    // Show confirmation for any count >= 1
+    if (accompanyingCount >= 1) {
+      setShowConfirmation(true);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Proceed with submission
     setIsSubmitting(true);
     setError('');
+    setShowConfirmation(false);
 
     if (!formData.event_id) {
       setError('Please select an event');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (formData.area_of_interest.length === 0) {
+      setError('Please select at least one area of interest');
       setIsSubmitting(false);
       return;
     }
@@ -110,6 +148,27 @@ export default function VisitorRegister() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleConfirmSubmit = () => {
+    setPendingSubmit(true);
+    setShowConfirmation(false);
+    // Scroll to the submit button
+    setTimeout(() => {
+      const submitButton = document.querySelector('button[type="submit"]');
+      if (submitButton) {
+        submitButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add a visual highlight effect
+        submitButton.classList.add('ring-4', 'ring-primary-300', 'ring-offset-2');
+        setTimeout(() => {
+          submitButton.classList.remove('ring-4', 'ring-primary-300', 'ring-offset-2');
+        }, 2000);
+      }
+    }, 300);
+  };
+
+  const handleCancelConfirmation = () => {
+    setShowConfirmation(false);
   };
 
   if (registeredVisitor) {
@@ -200,6 +259,20 @@ export default function VisitorRegister() {
               </div>
             </div>
 
+            {/* Data Privacy Disclaimer */}
+            <div className="p-3 sm:p-4 bg-gray-50 border border-gray-300 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <div className="text-xs text-gray-600">
+                  <p>
+                    <strong className="text-gray-800">Privacy Notice:</strong> Your information is collected solely for verification and security purposes. We do not share your data with third parties.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="label text-xs sm:text-sm">Select Event / Date *</label>
               {isLoadingEvents ? (
@@ -257,37 +330,52 @@ export default function VisitorRegister() {
 
             {/* Area of Interest */}
             <div>
-              <label className="label text-xs sm:text-sm">Area of Interest *</label>
-              <select
-                name="area_of_interest"
-                value={formData.area_of_interest}
-                onChange={handleChange}
-                required
-                className="input-field text-sm sm:text-base cursor-pointer dropdown-scrollable"
-              >
-                <option value="">Select your area of interest</option>
-                <option value="English and Cultural Studies">English and Cultural Studies</option>
-                <option value="Media Studies">Media Studies</option>
-                <option value="Performing Arts, Theatre Studies and Music">Performing Arts, Theatre Studies and Music</option>
-                <option value="Business and Management">Business and Management</option>
-                <option value="Hotel Management">Hotel Management</option>
-                <option value="Commerce">Commerce</option>
-                <option value="Professional Studies">Professional Studies</option>
-                <option value="Education">Education</option>
-                <option value="Law">Law</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Computer Science">Computer Science</option>
-                <option value="Life Sciences">Life Sciences</option>
-                <option value="Mathematics">Mathematics</option>
-                <option value="Physics and Electronics">Physics and Electronics</option>
-                <option value="Statistics and Data Science">Statistics and Data Science</option>
-                <option value="Economics">Economics</option>
-                <option value="International Studies, Political Science, and History">International Studies, Political Science, and History</option>
-                <option value="Psychology">Psychology</option>
-                <option value="Sociology and Social Work">Sociology and Social Work</option>
-                <option value="Languages">Languages</option>
-                <option value="Other">Other</option>
-              </select>
+              <label className="label text-xs sm:text-sm mb-3">Area of Interest * <span className="text-gray-500 font-normal">(Select one or more)</span></label>
+              <div className="border border-gray-300 rounded-lg p-3 max-h-60 overflow-y-auto bg-white">
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    'English and Cultural Studies',
+                    'Media Studies',
+                    'Performing Arts, Theatre Studies and Music',
+                    'Business and Management',
+                    'Hotel Management',
+                    'Commerce',
+                    'Professional Studies',
+                    'Education',
+                    'Law',
+                    'Chemistry',
+                    'Computer Science',
+                    'Life Sciences',
+                    'Mathematics',
+                    'Physics and Electronics',
+                    'Statistics and Data Science',
+                    'Economics',
+                    'International Studies, Political Science, and History',
+                    'Psychology',
+                    'Sociology and Social Work',
+                    'Languages',
+                    'Other',
+                  ].map((interest) => (
+                    <label
+                      key={interest}
+                      className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.area_of_interest.includes(interest)}
+                        onChange={() => handleCheckboxChange(interest)}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-gray-700">{interest}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {formData.area_of_interest.length > 0 && (
+                <p className="mt-2 text-xs text-indigo-600 font-medium">
+                  Selected ({formData.area_of_interest.length}): {formData.area_of_interest.join(', ')}
+                </p>
+              )}
             </div>
 
             {/* Number of Accompanying People */}
@@ -298,60 +386,40 @@ export default function VisitorRegister() {
                 name="accompanying_count"
                 value={formData.accompanying_count}
                 onChange={handleChange}
+                onBlur={handleAccompanyingCountBlur}
                 min="0"
                 max="500"
                 className="input-field text-xs sm:text-sm py-2"
                 placeholder="Enter number (e.g., 0, 5, 100)"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                ⚠️ Entry will be granted only for the registered number of people (including you)
-              </p>
             </div>
 
-            {/* Hidden field - Public registration is always for students (Blue QR) */}
-            <input type="hidden" name="visitor_category" value="student" />
-            
-            <div className="p-3 sm:p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
-              <div className="flex items-start sm:items-center space-x-2 sm:space-x-3">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0 mt-0.5 sm:mt-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <p className="text-xs sm:text-sm font-semibold text-blue-800">Visitor Registration</p>
-                  <p className="text-xs text-blue-600 mt-0.5">
-                    Public registration is for visitors only. You will receive a Blue QR Code.
-                    For speaker/VIP registration, contact the event organizer.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Data Privacy Disclaimer */}
-            <div className="p-3 sm:p-4 bg-gray-50 border border-gray-300 rounded-lg">
+            {/* Important Message for Accompanying Count */}
+            <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-start space-x-2">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <div className="text-xs text-gray-600">
-                  <p className="mb-2">
-                    <strong className="text-gray-800">Privacy Notice:</strong> Your information is collected solely for verification and security purposes. We do not share your data with third parties.
-                  </p>
-                  <p className="text-red-600 font-semibold">
+                <div className="text-xs text-red-700">
+                  <p className="font-semibold">
                     <strong>Important:</strong> Only the registered number of people (you + companions) will be granted entry at the gate.
                   </p>
                 </div>
               </div>
             </div>
 
+            {/* Hidden field - Public registration is always for students (Blue QR) */}
+            <input type="hidden" name="visitor_category" value="student" />
+
             <div>
-              <label className="label text-xs sm:text-sm">Purpose</label>
+              <label className="label text-xs sm:text-sm">Purpose <span className="text-gray-400 text-xs font-normal">(Optional)</span></label>
               <textarea
                 name="purpose"
                 value={formData.purpose}
                 onChange={handleChange}
                 rows={2}
                 className="input-field text-xs sm:text-sm py-2"
-                placeholder="Brief description Not Mandatory"
+                placeholder="(Optional - leave blank if not applicable)"
               />
             </div>
 
@@ -383,6 +451,56 @@ export default function VisitorRegister() {
             <strong>Note:</strong> Save your QR code and present it at the gate.
           </div>
         </motion.div>
+
+        {/* Confirmation Modal */}
+        {showConfirmation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
+            >
+              <div className="flex items-start space-x-4 mb-4">
+                <div className="flex-shrink-0">
+                  <svg className="w-12 h-12 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-800 mb-2">
+                    Confirm Accompanying Count
+                  </h3>
+                  <p className="text-gray-700 text-sm mb-3">
+                    You have entered <span className="font-bold text-amber-600">{formData.accompanying_count} people</span> accompanying with you.
+                  </p>
+                  <p className="text-gray-600 text-sm">
+                    This means a total of <span className="font-bold text-primary-600">{parseInt(formData.accompanying_count) + 1} people</span> (including you) will need entry.
+                  </p>
+                  <div className="mt-3 p-3 bg-amber-50 border-l-4 border-amber-400 rounded">
+                    <p className="text-xs text-amber-800">
+                      <strong>⚠️ Important:</strong> Entry will be granted only for this registered count. Please confirm this is correct.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                <button
+                  onClick={handleCancelConfirmation}
+                  className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition text-sm font-semibold text-gray-700"
+                >
+                  No, Let Me Change
+                </button>
+                <button
+                  onClick={handleConfirmSubmit}
+                  className="flex-1 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition text-sm font-semibold shadow-md"
+                >
+                  Yes, Confirm & Continue
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     </div>
   );
