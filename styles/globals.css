@@ -43,6 +43,55 @@ body {
   @apply block text-sm font-medium text-gray-700 mb-2;
 }
 
+/* Scrollable Select Dropdown */
+.select-scrollable {
+  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-base transition-all;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.select-scrollable option {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.select-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+
+.select-scrollable::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.select-scrollable::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.select-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Dropdown with scrollable menu */
+.dropdown-scrollable {
+  appearance: auto;
+  -webkit-appearance: menulist;
+  -moz-appearance: menulist;
+}
+
+.dropdown-scrollable option {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+/* For browsers that support it, limit dropdown height */
+@supports (-webkit-appearance: none) or (-moz-appearance: none) {
+  .dropdown-scrollable {
+    max-height: 300px;
+  }
+}
+
 /* Badge Styles */
 .badge-pending {
   @apply bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs md:text-sm font-semibold;

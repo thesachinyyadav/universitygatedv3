@@ -27,6 +27,8 @@ export default function VisitorRegister() {
     event_id: '',
     visitor_category: 'student',
     purpose: '',
+    area_of_interest: '',
+    accompanying_count: '0',
   });
   const [capturedPhoto, setCapturedPhoto] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,11 +69,12 @@ export default function VisitorRegister() {
       return;
     }
 
-    if (!capturedPhoto) {
-      setError('Please capture your photo before registering');
-      setIsSubmitting(false);
-      return;
-    }
+    // Photo capture temporarily disabled
+    // if (!capturedPhoto) {
+    //   setError('Please capture your photo before registering');
+    //   setIsSubmitting(false);
+    //   return;
+    // }
 
     const selectedEvent = approvedEvents.find(e => e.id === formData.event_id);
     if (!selectedEvent) {
@@ -185,20 +188,20 @@ export default function VisitorRegister() {
               </div>
 
               <div>
-                <label className="label text-xs sm:text-sm">College Register Number</label>
+                <label className="label text-xs sm:text-sm">Valid ID Card Number</label>
                 <input
                   type="text"
                   name="register_number"
                   value={formData.register_number}
                   onChange={handleChange}
                   className="input-field text-xs sm:text-sm py-2"
-                  placeholder="e.g., 2021BCSXXX"
+                  placeholder="e.g., ID12345678"
                 />
               </div>
             </div>
 
             <div>
-              <label className="label text-xs sm:text-sm">Select Event *</label>
+              <label className="label text-xs sm:text-sm">Select Event / Date *</label>
               {isLoadingEvents ? (
                 <div className="input-field flex items-center space-x-2 text-sm sm:text-base">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
@@ -216,7 +219,7 @@ export default function VisitorRegister() {
                   required
                   className="input-field text-sm sm:text-base"
                 >
-                  <option value="">Select an event</option>
+                  <option value="">Select an event / date</option>
                   {approvedEvents.map(event => (
                     <option key={event.id} value={event.id}>
                       {event.event_name} - {new Date(event.date_from).toLocaleDateString()} to {new Date(event.date_to).toLocaleDateString()} ({event.available_slots} slots available)
@@ -252,6 +255,59 @@ export default function VisitorRegister() {
               })()}
             </div>
 
+            {/* Area of Interest */}
+            <div>
+              <label className="label text-xs sm:text-sm">Area of Interest *</label>
+              <select
+                name="area_of_interest"
+                value={formData.area_of_interest}
+                onChange={handleChange}
+                required
+                className="input-field text-sm sm:text-base cursor-pointer dropdown-scrollable"
+              >
+                <option value="">Select your area of interest</option>
+                <option value="English and Cultural Studies">English and Cultural Studies</option>
+                <option value="Media Studies">Media Studies</option>
+                <option value="Performing Arts, Theatre Studies and Music">Performing Arts, Theatre Studies and Music</option>
+                <option value="Business and Management">Business and Management</option>
+                <option value="Hotel Management">Hotel Management</option>
+                <option value="Commerce">Commerce</option>
+                <option value="Professional Studies">Professional Studies</option>
+                <option value="Education">Education</option>
+                <option value="Law">Law</option>
+                <option value="Chemistry">Chemistry</option>
+                <option value="Computer Science">Computer Science</option>
+                <option value="Life Sciences">Life Sciences</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Physics and Electronics">Physics and Electronics</option>
+                <option value="Statistics and Data Science">Statistics and Data Science</option>
+                <option value="Economics">Economics</option>
+                <option value="International Studies, Political Science, and History">International Studies, Political Science, and History</option>
+                <option value="Psychology">Psychology</option>
+                <option value="Sociology and Social Work">Sociology and Social Work</option>
+                <option value="Languages">Languages</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            {/* Number of Accompanying People */}
+            <div>
+              <label className="label text-xs sm:text-sm">Number of People Accompanying with You</label>
+              <input
+                type="number"
+                name="accompanying_count"
+                value={formData.accompanying_count}
+                onChange={handleChange}
+                min="0"
+                max="500"
+                className="input-field text-xs sm:text-sm py-2"
+                placeholder="Enter number (e.g., 0, 5, 100)"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                ⚠️ Entry will be granted only for the registered number of people (including you)
+              </p>
+            </div>
+
             {/* Hidden field - Public registration is always for students (Blue QR) */}
             <input type="hidden" name="visitor_category" value="student" />
             
@@ -261,10 +317,27 @@ export default function VisitorRegister() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <p className="text-xs sm:text-sm font-semibold text-blue-800">Student Registration</p>
+                  <p className="text-xs sm:text-sm font-semibold text-blue-800">Visitor Registration</p>
                   <p className="text-xs text-blue-600 mt-0.5">
-                    Public registration is for students only. You will receive a Blue QR Code.
+                    Public registration is for visitors only. You will receive a Blue QR Code.
                     For speaker/VIP registration, contact the event organizer.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Data Privacy Disclaimer */}
+            <div className="p-3 sm:p-4 bg-gray-50 border border-gray-300 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <div className="text-xs text-gray-600">
+                  <p className="mb-2">
+                    <strong className="text-gray-800">Privacy Notice:</strong> Your information is collected solely for verification and security purposes. We do not share your data with third parties.
+                  </p>
+                  <p className="text-red-600 font-semibold">
+                    <strong>Important:</strong> Only the registered number of people (you + companions) will be granted entry at the gate.
                   </p>
                 </div>
               </div>
@@ -278,15 +351,15 @@ export default function VisitorRegister() {
                 onChange={handleChange}
                 rows={2}
                 className="input-field text-xs sm:text-sm py-2"
-                placeholder="Brief description"
+                placeholder="Brief description Not Mandatory"
               />
             </div>
 
-            {/* Photo Capture */}
-            <PhotoCapture 
+            {/* Photo Capture - Temporarily hidden but functionality preserved */}
+            {/* <PhotoCapture 
               onPhotoCapture={setCapturedPhoto}
               capturedPhoto={capturedPhoto}
-            />
+            /> */}
 
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button
