@@ -6,10 +6,26 @@
   --primary: #254a9a;
   --secondary: #ffffff;
   --tertiary: #bda361;
+  /* Safe area insets for PWA/notch devices */
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* Enable safe area insets for the entire document */
+html {
+  /* Ensure PWA uses full viewport */
+  height: 100%;
+  height: -webkit-fill-available;
 }
 
 body {
   @apply bg-gray-50;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  /* Prevent pull-to-refresh in PWA */
+  overscroll-behavior-y: contain;
 }
 
 /* Custom Button Styles */
@@ -29,6 +45,21 @@ body {
 /* Form Input Styles */
 .input-field {
   @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-base transition-all;
+  /* Prevent iOS zoom on focus */
+  font-size: 16px !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Input with left icon - increased padding to prevent overlap */
+.input-field.has-left-icon,
+.input-field[class*="pl-"] {
+  padding-left: 2.75rem !important; /* 44px */
+}
+
+/* Input with right icon */
+.input-field.has-right-icon {
+  padding-right: 2.75rem !important;
 }
 
 .input-field:focus {
@@ -198,6 +229,35 @@ html {
   input[type="checkbox"],
   input[type="radio"] {
     @apply w-6 h-6;
+  }
+  
+  /* Ensure inputs are easily tappable on mobile */
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom */
+    min-height: 48px;
+  }
+}
+
+/* PWA Standalone Mode - Safe Area Handling */
+@media all and (display-mode: standalone) {
+  /* Add padding for status bar/notch in PWA mode */
+  .pwa-safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  
+  .pwa-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  
+  /* Navbar specific fix for PWA */
+  nav.sticky {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
 

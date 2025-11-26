@@ -40,6 +40,11 @@ export default function ManualEntry({ onVerify }: ManualEntryProps) {
             onChange={(e) => setManualId(e.target.value)}
             placeholder="Paste or type visitor ID"
             className="input-field"
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="text"
           />
         </div>
         <button

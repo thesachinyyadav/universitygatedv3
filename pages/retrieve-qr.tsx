@@ -142,7 +142,7 @@ export default function RetrieveQR() {
                   {searchMethod === 'phone' && 'Phone Number'}
                 </label>
                 <input
-                  type={searchMethod === 'email' ? 'email' : 'text'}
+                  type={searchMethod === 'email' ? 'email' : 'tel'}
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleRetrieve()}
@@ -151,6 +151,11 @@ export default function RetrieveQR() {
                     '+91 1234567890'
                   }
                   className="input-field text-sm"
+                  autoComplete={searchMethod === 'email' ? 'email' : 'tel'}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode={searchMethod === 'email' ? 'email' : 'tel'}
                 />
               </div>
 

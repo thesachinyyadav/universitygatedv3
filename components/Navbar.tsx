@@ -56,8 +56,10 @@ export default function Navbar({ role }: NavbarProps = {}) {
   };
 
   return (
-    <nav className="bg-primary-600 text-white shadow-lg sticky top-0 z-50">
-      <div className="container mx-auto px-4">
+    <nav className="bg-primary-600 text-white shadow-lg sticky top-0 z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      {/* Safe area background for notch/status bar */}
+      <div className="absolute inset-x-0 top-0 bg-primary-600" style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+      <div className="container mx-auto px-4" style={{ paddingLeft: 'max(1rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(1rem, env(safe-area-inset-right, 0px))' }}>
         <div className="flex justify-between items-center h-16 md:h-20">
           {/* Logo and Title */}
           <Link href="/" className="flex items-center space-x-2 md:space-x-3 hover:opacity-90 transition">

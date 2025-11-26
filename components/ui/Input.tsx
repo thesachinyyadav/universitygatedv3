@@ -54,7 +54,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         
         <div className="relative">
           {leftIcon && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none flex items-center justify-center w-5 h-5">
               {leftIcon}
             </div>
           )}
@@ -66,8 +66,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             onChange={handleChange}
             maxLength={maxLength}
             className={`input-field ${error ? 'error' : ''} ${
-              leftIcon ? 'pl-10' : ''
-            } ${rightIcon ? 'pr-10' : ''} ${className}`}
+              leftIcon ? 'pl-11' : ''
+            } ${rightIcon ? 'pr-11' : ''} ${className}`}
+            autoComplete={type === 'password' ? 'current-password' : type === 'email' ? 'email' : 'off'}
+            autoCapitalize={type === 'email' || type === 'password' ? 'none' : 'sentences'}
+            autoCorrect={type === 'email' || type === 'password' ? 'off' : 'on'}
+            spellCheck={type === 'email' || type === 'password' ? false : true}
+            inputMode={type === 'email' ? 'email' : type === 'tel' ? 'tel' : type === 'number' ? 'numeric' : 'text'}
             {...props}
           />
           

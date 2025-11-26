@@ -4,6 +4,8 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
+        {/* Viewport for PWA with safe area support */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         {/* Favicon */}
         <link rel="icon" href="/christunifavcion.png" />
         <link rel="apple-touch-icon" href="/christunifavcion.png" />
@@ -46,7 +48,7 @@ export default function Document() {
         <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
         <link rel="icon" type="image/png" sizes="512x512" href="/icon-512x512.png" />
       </Head>
-      <body>
+      <body className="pwa-safe-bottom">
         <Main />
         <NextScript />
       </body>
