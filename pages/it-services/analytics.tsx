@@ -147,99 +147,118 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading analytics...</p>
+          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg mb-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
+          </div>
+          <p className="text-gray-500 font-medium">Loading analytics...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header with Back Button */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6 sm:mb-8"
         >
           <Link href="/it-services">
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="mb-4 flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
+              whileHover={{ x: -4 }}
+              whileTap={{ scale: 0.98 }}
+              className="mb-4 flex items-center text-gray-500 hover:text-indigo-600 font-medium text-sm transition-colors"
             >
-              <ArrowLeft className="h-5 w-5 mr-2" />
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
               Back to Dashboard
             </motion.button>
           </Link>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Analytics Dashboard</h1>
-          <p className="text-gray-600">Visitor statistics and insights</p>
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <TrendingUp className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Analytics</h1>
+              <p className="text-gray-500 text-sm sm:text-base">Visitor statistics & insights</p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Stats Cards */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 sm:mb-8">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-lg shadow-md p-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Visitors Registered</p>
-                  <p className="text-2xl font-bold text-indigo-600">{stats.totalRegistered}</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Registered</p>
+                  <p className="text-3xl font-bold text-indigo-600 mt-1">{stats.totalRegistered}</p>
+                  <p className="text-xs text-gray-400 mt-1">visitors</p>
                 </div>
-                <Users className="h-10 w-10 text-indigo-400" />
+                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <Users className="h-5 w-5 text-indigo-600" />
+                </div>
               </div>
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="bg-white rounded-lg shadow-md p-6"
+              className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Visitors Arrived</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.totalArrived}</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Arrived</p>
+                  <p className="text-3xl font-bold text-green-600 mt-1">{stats.totalArrived}</p>
+                  <p className="text-xs text-gray-400 mt-1">checked in</p>
                 </div>
-                <CheckCircle className="h-10 w-10 text-green-400" />
+                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                </div>
               </div>
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="bg-white rounded-lg shadow-md p-6"
+              className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Footfall (Reg.)</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.totalFootfallRegistered}</p>
-                  <p className="text-xs text-gray-500 mt-1">Includes companions</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Footfall (Reg)</p>
+                  <p className="text-3xl font-bold text-blue-600 mt-1">{stats.totalFootfallRegistered}</p>
+                  <p className="text-xs text-gray-400 mt-1">incl. companions</p>
                 </div>
-                <Users className="h-10 w-10 text-blue-400" />
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Users className="h-5 w-5 text-blue-600" />
+                </div>
               </div>
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="bg-white rounded-lg shadow-md p-6"
+              className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Footfall (Inside)</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.totalFootfallArrived}</p>
-                  <p className="text-xs text-gray-500 mt-1">Includes companions</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Inside Now</p>
+                  <p className="text-3xl font-bold text-purple-600 mt-1">{stats.totalFootfallArrived}</p>
+                  <p className="text-xs text-gray-400 mt-1">incl. companions</p>
                 </div>
-                <UserCheck className="h-10 w-10 text-purple-400" />
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <UserCheck className="h-5 w-5 text-purple-600" />
+                </div>
               </div>
             </motion.div>
           </div>
@@ -250,47 +269,59 @@ export default function AnalyticsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-lg shadow-md p-6"
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 sm:p-6"
           >
-            <div className="flex items-center mb-6">
-              <Target className="h-6 w-6 text-indigo-600 mr-2" />
-              <h2 className="text-2xl font-bold text-gray-800">Area of Interest Breakdown</h2>
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center">
+                <Target className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800">Area of Interest</h2>
+                <p className="text-xs text-gray-500">Visitor distribution by interest</p>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {areaStats.map((areaStat, index) => (
-                <motion.div
-                  key={areaStat.area}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg p-4 border border-indigo-100"
-                >
-                  <h3 className="font-semibold text-gray-800 mb-2 truncate" title={areaStat.area}>
-                    {areaStat.area}
-                  </h3>
-                  <div className="flex items-center justify-between text-sm mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {areaStats.map((areaStat, index) => {
+                const arrivalRate = areaStat.total > 0 ? Math.round((areaStat.arrived / areaStat.total) * 100) : 0;
+                return (
+                  <motion.div
+                    key={areaStat.area}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * index }}
+                    className="bg-gray-50 border border-gray-100 rounded-xl p-4 hover:border-indigo-200 hover:bg-indigo-50/30 transition-colors"
+                  >
+                    <h3 className="font-semibold text-gray-800 text-sm mb-3 truncate" title={areaStat.area}>
+                      {areaStat.area}
+                    </h3>
+                    <div className="flex items-end justify-between mb-3">
+                      <div>
+                        <p className="text-xs text-gray-400 uppercase tracking-wider">Registered</p>
+                        <p className="text-2xl font-bold text-indigo-600">{areaStat.total}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-400 uppercase tracking-wider">Arrived</p>
+                        <p className="text-2xl font-bold text-green-600">{areaStat.arrived}</p>
+                      </div>
+                    </div>
                     <div>
-                      <p className="text-gray-600">Registered</p>
-                      <p className="text-2xl font-bold text-indigo-600">{areaStat.total}</p>
+                      <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500 ease-out"
+                          style={{ 
+                            width: `${arrivalRate}%`,
+                            background: `linear-gradient(90deg, #6366f1 0%, #22c55e 100%)`
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1.5 text-center">
+                        {arrivalRate}% arrival rate
+                      </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-gray-600">Arrived</p>
-                      <p className="text-2xl font-bold text-green-600">{areaStat.arrived}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-gradient-to-r from-indigo-500 to-green-500 h-2 rounded-full transition-all"
-                        style={{ width: `${areaStat.total > 0 ? (areaStat.arrived / areaStat.total) * 100 : 0}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1 text-center">
-                      {areaStat.total > 0 ? Math.round((areaStat.arrived / areaStat.total) * 100) : 0}% arrival rate
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           </motion.div>
         )}
@@ -300,11 +331,13 @@ export default function AnalyticsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-lg shadow-md p-12 text-center"
+            className="bg-white rounded-2xl shadow-lg border border-gray-100 p-12 text-center"
           >
-            <Target className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No Data Available</h3>
-            <p className="text-gray-600">Area of interest data will appear here once visitors register.</p>
+            <div className="w-20 h-20 mx-auto bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+              <Target className="h-10 w-10 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">No Data Yet</h3>
+            <p className="text-gray-500 text-sm">Analytics will appear once visitors start registering.</p>
           </motion.div>
         )}
       </div>

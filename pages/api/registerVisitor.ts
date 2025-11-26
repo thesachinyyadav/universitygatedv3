@@ -156,6 +156,19 @@ export default async function handler(
     // Insert visitor into database
     // The trigger will automatically set the qr_color based on visitor_category
     // The trigger will automatically increment event registrations
+    
+    // Ensure area_of_interest is a proper array for JSONB column
+    let areaOfInterestArray: string[] = [];
+    if (Array.isArray(area_of_interest)) {
+      areaOfInterestArray = area_of_interest;
+    } else if (typeof area_of_interest === 'string') {
+      try {
+        areaOfInterestArray = JSON.parse(area_of_interest);
+      } catch {
+        areaOfInterestArray = [area_of_interest];
+      }
+    }
+    
     const { data, error } = await supabase
       .from('visitors')
       .insert([
@@ -170,7 +183,7 @@ export default async function handler(
           date_of_visit_to,
           visitor_category,
           purpose,
-          area_of_interest: JSON.stringify(area_of_interest),
+          area_of_interest: areaOfInterestArray, // Pass array directly for JSONB
           accompanying_count: parseInt(accompanying_count) || 0,
           photo_url: photoUrl,
           status: 'approved', // Auto-approved since event is already approved

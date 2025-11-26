@@ -356,105 +356,120 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="card text-center max-w-lg mx-auto shadow-xl"
+      className="bg-white rounded-2xl shadow-lg border border-gray-100 text-center max-w-lg mx-auto p-6 sm:p-8"
     >
-      {/* Success Icon SVG */}
-      <div className="mb-6">
-        <svg className="w-16 h-16 mx-auto text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+      {/* Success Icon */}
+      <div className="mb-5">
+        <div className="w-16 h-16 mx-auto bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
+          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
       </div>
 
-      <h2 className="text-2xl md:text-3xl font-bold text-primary-600 mb-3">
-        Registration Successful
+      <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
+        Your Access Pass
       </h2>
       
-      <p className="text-gray-600 mb-8 px-4">
-        Your access request has been recorded. Present this QR code at the security gate.
+      <p className="text-gray-500 text-sm mb-6 px-2">
+        Present this QR code at the security gate for verification
       </p>
 
-      {/* QR Code Display with Colored Border */}
+      {/* QR Code Display with Subtle Border */}
       <div className="mb-6 inline-block">
-        <div 
-          className="p-1 rounded-xl shadow-lg"
-          style={{ 
-            backgroundColor: visitorDetails?.qr_color || '#254a9a',
-            padding: '8px'
-          }}
-        >
-          <div className="bg-white p-4 rounded-lg">
+        <div className="relative">
+          {/* Subtle gradient border */}
+          <div 
+            className="absolute inset-0 rounded-2xl opacity-20"
+            style={{ 
+              backgroundColor: visitorDetails?.qr_color || '#254a9a',
+            }}
+          />
+          <div 
+            className="relative bg-white rounded-2xl shadow-lg border-2 p-5"
+            style={{ 
+              borderColor: visitorDetails?.qr_color ? `${visitorDetails.qr_color}40` : '#254a9a40',
+            }}
+          >
             {qrCodeUrl && !isLoading ? (
-              <img src={qrCodeUrl} alt="QR Code" className="mx-auto w-64 h-64 md:w-80 md:h-80" />
+              <img src={qrCodeUrl} alt="QR Code" className="mx-auto w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72" />
             ) : (
-              <div className="w-64 h-64 md:w-80 md:h-80 flex items-center justify-center">
+              <div className="w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
               </div>
             )}
           </div>
         </div>
-        {visitorDetails?.qr_color && (
-          <p className="text-xs text-gray-500 text-center mt-2">
-            Color-coded QR for {visitorDetails.visitor_category} category
-          </p>
+        {visitorDetails?.visitor_category && (
+          <div className="mt-3 flex items-center justify-center space-x-2">
+            <span 
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: visitorDetails?.qr_color || '#254a9a' }}
+            />
+            <p className="text-xs text-gray-500">
+              {visitorDetails.visitor_category.charAt(0).toUpperCase() + visitorDetails.visitor_category.slice(1)} Access Pass
+            </p>
+          </div>
         )}
       </div>
 
       {/* Visitor Info */}
-      <div className="mb-6 bg-primary-50 p-4 rounded-lg space-y-3">
-        <div>
-          <p className="text-sm text-gray-700">
-            <span className="font-semibold text-primary-600">Name:</span> {visitorName}
-          </p>
-        </div>
-        
-        {visitorDetails?.visitor_category && (
-          <div>
-            <p className="text-sm text-gray-700 mb-2">
-              <span className="font-semibold text-primary-600">Category:</span>
-            </p>
+      <div className="mb-6 bg-gray-50 border border-gray-100 p-4 sm:p-5 rounded-xl space-y-4">
+        {/* Name & Category Row */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="text-left">
+            <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Visitor Name</p>
+            <p className="text-base font-semibold text-gray-800 mt-0.5">{visitorName}</p>
+          </div>
+          
+          {visitorDetails?.visitor_category && (
             <span 
-              className="inline-block px-4 py-2 rounded-full text-white font-semibold text-sm shadow-md"
-              style={{ backgroundColor: visitorDetails.qr_color }}
+              className="inline-flex items-center px-3 py-1.5 rounded-lg text-white font-medium text-xs shadow-sm"
+              style={{ 
+                backgroundColor: visitorDetails.qr_color,
+                opacity: 0.9
+              }}
             >
               {visitorDetails.visitor_category === 'student' && '🎓 Student'}
-              {visitorDetails.visitor_category === 'speaker' && '🎤 Speaker/Guest'}
+              {visitorDetails.visitor_category === 'speaker' && '🎤 Speaker'}
               {visitorDetails.visitor_category === 'vip' && '⭐ VIP'}
             </span>
-          </div>
-        )}
+          )}
+        </div>
 
-        {visitorDetails?.event_name && (
-          <div>
-            <p className="text-sm text-gray-700">
-              <span className="font-semibold text-primary-600">Event:</span> {visitorDetails.event_name}
-            </p>
-          </div>
-        )}
+        {/* Divider */}
+        <div className="border-t border-gray-200"></div>
 
-        {visitorDetails?.date_of_visit_from && visitorDetails?.date_of_visit_to && (
-          <div>
-            <p className="text-sm text-gray-700">
-              <span className="font-semibold text-primary-600">Valid Dates:</span>
-            </p>
-            <p className="text-xs text-gray-600 mt-1">
-              {new Date(visitorDetails.date_of_visit_from).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric'
-              })} 
-              {' to '}
-              {new Date(visitorDetails.date_of_visit_to).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric'
-              })}
-            </p>
-          </div>
-        )}
+        {/* Event & Dates */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {visitorDetails?.event_name && (
+            <div className="text-left">
+              <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Event</p>
+              <p className="text-sm text-gray-700 mt-0.5">{visitorDetails.event_name}</p>
+            </div>
+          )}
 
-        <div>
-          <p className="text-xs text-gray-500">
-            <span className="font-semibold">Visitor ID:</span> {visitorId}
+          {visitorDetails?.date_of_visit_from && visitorDetails?.date_of_visit_to && (
+            <div className="text-left">
+              <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Valid Period</p>
+              <p className="text-sm text-gray-700 mt-0.5">
+                {new Date(visitorDetails.date_of_visit_from).toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'short'
+                })} - {new Date(visitorDetails.date_of_visit_to).toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                })}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Visitor ID */}
+        <div className="pt-2 border-t border-gray-200">
+          <p className="text-xs text-gray-400 text-center">
+            ID: <span className="font-mono text-gray-500">{visitorId}</span>
           </p>
         </div>
       </div>
@@ -463,7 +478,7 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
       <div className="space-y-3">
         <button
           onClick={downloadPDF}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+          className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -473,7 +488,7 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
         
         <button
           onClick={downloadQR}
-          className="w-full bg-tertiary-600 hover:bg-tertiary-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+          className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 border border-gray-200"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -481,38 +496,40 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
           <span>Download QR Image</span>
         </button>
 
-        <div className="flex flex-col sm:flex-row gap-3 mt-2">
+        <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-gray-100">
           <a
             href="/retrieve-qr"
-            className="flex-1 text-center text-primary-600 hover:text-primary-700 font-medium py-2 text-sm inline-flex items-center justify-center space-x-1"
+            className="flex-1 text-center text-gray-500 hover:text-primary-600 font-medium py-2 text-sm inline-flex items-center justify-center space-x-1.5 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <span>Retrieve QR Later</span>
+            <span>Retrieve Later</span>
           </a>
           <a
             href="/"
-            className="flex-1 text-center text-primary-600 hover:text-primary-700 font-medium py-2 text-sm inline-flex items-center justify-center space-x-1"
+            className="flex-1 text-center text-gray-500 hover:text-primary-600 font-medium py-2 text-sm inline-flex items-center justify-center space-x-1.5 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
-            <span>Return to Home</span>
+            <span>Return Home</span>
           </a>
         </div>
       </div>
 
       {/* Important Notice */}
-      <div className="mt-6 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r-lg text-left">
+      <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
         <div className="flex items-start space-x-3">
-          <svg className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div>
-            <p className="font-semibold text-gray-800 text-sm">Important</p>
-            <p className="text-sm text-gray-600 mt-1">
-              Save or print this QR code. You'll need it for entry verification at the security gate.
+          <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div className="text-left">
+            <p className="font-semibold text-gray-700 text-sm">Save your pass</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Download or screenshot this QR code for entry at the security gate.
             </p>
           </div>
         </div>

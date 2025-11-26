@@ -308,159 +308,233 @@ export default function ITServicesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg mb-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
+          </div>
+          <p className="text-gray-500 font-medium">Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header with Analytics Button */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 flex justify-between items-center"
+          className="mb-6 sm:mb-8"
         >
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">IT Services Dashboard</h1>
-            <p className="text-gray-600">Search and manage visitor check-ins</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
+                <UserCheck className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">IT Services</h1>
+                <p className="text-gray-500 text-sm sm:text-base">Manage visitor check-ins</p>
+              </div>
+            </div>
+            <Link href="/it-services/analytics">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white px-5 py-2.5 rounded-xl font-medium shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+              >
+                <BarChart3 className="h-5 w-5" />
+                <span>View Analytics</span>
+              </motion.button>
+            </Link>
           </div>
-          <Link href="/it-services/analytics">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium shadow-lg transition-colors flex items-center space-x-2"
-            >
-              <BarChart3 className="h-5 w-5" />
-              <span>View Analytics</span>
-            </motion.button>
-          </Link>
         </motion.div>
 
         {/* Search Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-lg shadow-md p-6 mb-6"
+          className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-6"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <Search className="h-6 w-6 text-indigo-600 mr-2" />
-              <h2 className="text-xl font-bold text-gray-800">Search Visitors</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <Search className="h-4 w-4 text-indigo-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-800">Search Visitors</h2>
             </div>
             <button
               onClick={handleManualRefresh}
               disabled={isRefreshing}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
+              className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-xl font-medium transition-all text-sm ${
                 isRefreshing
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="text-sm">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
             </button>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by name, phone, or email..."
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-lg"
+              className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white text-base transition-all"
             />
           </div>
           {searchTerm && (
-            <p className="mt-3 text-sm text-gray-600">
-              Found <span className="font-bold text-indigo-600">{filteredVisitors.length}</span> matching result{filteredVisitors.length !== 1 ? 's' : ''}
-            </p>
+            <div className="mt-3 flex items-center space-x-2">
+              <span className="inline-flex items-center px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-sm font-medium">
+                {filteredVisitors.length} result{filteredVisitors.length !== 1 ? 's' : ''}
+              </span>
+              <button
+                onClick={() => setSearchTerm('')}
+                className="text-gray-400 hover:text-gray-600 text-sm"
+              >
+                Clear search
+              </button>
+            </div>
           )}
         </motion.div>
 
-        {/* Stats moved to separate analytics page */}
+        {/* Quick Stats Bar */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6"
+        >
+          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Total</p>
+            <p className="text-2xl font-bold text-gray-800 mt-1">{visitors.length}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Checked In</p>
+            <p className="text-2xl font-bold text-green-600 mt-1">{visitors.filter(v => v.has_arrived).length}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Pending</p>
+            <p className="text-2xl font-bold text-amber-600 mt-1">{visitors.filter(v => !v.has_arrived).length}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Arrival Rate</p>
+            <p className="text-2xl font-bold text-indigo-600 mt-1">
+              {visitors.length > 0 ? Math.round((visitors.filter(v => v.has_arrived).length / visitors.length) * 100) : 0}%
+            </p>
+          </div>
+        </motion.div>
 
         {/* Visitors Table */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-lg shadow-md overflow-hidden"
+          transition={{ delay: 0.2 }}
+          className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
         >
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50/80 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
+                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Visitor
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">
                     Phone
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">
                     Event
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Check-in Status
+                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">
                     Companions
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total People
+                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">
+                    Total
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {filteredVisitors.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                      {searchTerm ? 'No visitors found matching your search.' : 'No visitors registered yet.'}
+                    <td colSpan={7} className="px-6 py-16 text-center">
+                      <div className="flex flex-col items-center">
+                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                          <Users className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <p className="text-gray-500 font-medium">
+                          {searchTerm ? 'No visitors found matching your search' : 'No visitors registered yet'}
+                        </p>
+                        {searchTerm && (
+                          <button
+                            onClick={() => setSearchTerm('')}
+                            className="mt-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                          >
+                            Clear search
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   filteredVisitors.map((visitor) => (
-                    <tr key={visitor.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {highlightText(visitor.name, searchTerm)}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {visitor.email ? highlightText(visitor.email, searchTerm) : ''}
+                    <tr key={visitor.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 sm:px-6 py-4">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold text-sm ${
+                            visitor.has_arrived ? 'bg-gradient-to-br from-green-400 to-green-600' : 'bg-gradient-to-br from-gray-300 to-gray-400'
+                          }`}>
+                            {visitor.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900">
+                              {highlightText(visitor.name, searchTerm)}
+                            </div>
+                            <div className="text-xs text-gray-500 sm:hidden">
+                              {highlightText(visitor.phone, searchTerm)}
+                            </div>
+                            <div className="text-xs text-gray-400 hidden sm:block">
+                              {visitor.email ? highlightText(visitor.email, searchTerm) : ''}
+                            </div>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-600 hidden sm:table-cell">
                         {highlightText(visitor.phone, searchTerm)}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {visitor.event_name}
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 hidden md:table-cell">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 text-xs font-medium">
+                          {visitor.event_name}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                         {visitor.has_arrived ? (
                           <div className="flex flex-col">
-                            <span className="flex items-center text-green-600 text-sm font-semibold mb-1">
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Checked In
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-green-50 text-green-700 text-xs font-semibold w-fit">
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                              Arrived
                             </span>
-                            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
-                              {new Date(visitor.arrived_at!).toLocaleString()}
+                            <span className="text-xs text-gray-400 mt-1">
+                              {new Date(visitor.arrived_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                         ) : (
-                          <span className="flex items-center text-red-600 text-sm font-semibold">
-                            <Clock className="h-4 w-4 mr-1" />
-                            Not Checked In
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-semibold">
+                            <Clock className="h-3.5 w-3.5 mr-1" />
+                            Pending
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden lg:table-cell">
                         {editingId === visitor.id ? (
                           <div className="flex items-center space-x-2">
                             <input
@@ -468,48 +542,50 @@ export default function ITServicesPage() {
                               min="0"
                               value={editCompanions}
                               onChange={(e) => setEditCompanions(parseInt(e.target.value) || 0)}
-                              className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
+                              className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-center text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                               disabled={processingId === visitor.id}
                             />
                             <button
                               onClick={() => saveCompanions(visitor.id, visitor.name)}
                               disabled={processingId === visitor.id}
-                              className="text-green-600 hover:text-green-800 disabled:opacity-50"
+                              className="w-7 h-7 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center disabled:opacity-50 transition-colors"
                               title="Save"
                             >
-                              <Save className="h-4 w-4" />
+                              <Save className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={cancelEdit}
                               disabled={processingId === visitor.id}
-                              className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                              className="w-7 h-7 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center disabled:opacity-50 transition-colors"
                               title="Cancel"
                             >
-                              <X className="h-4 w-4" />
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         ) : (
                           <div className="flex items-center space-x-2">
-                            <span className="text-center min-w-[40px]">{visitor.accompanying_count}</span>
+                            <span className="text-center min-w-[32px] font-medium">{visitor.accompanying_count}</span>
                             <button
                               onClick={() => startEdit(visitor)}
-                              className="text-indigo-600 hover:text-indigo-800"
+                              className="w-7 h-7 rounded-lg bg-gray-100 text-gray-500 hover:bg-indigo-100 hover:text-indigo-600 flex items-center justify-center transition-colors"
                               title="Edit companion count"
                             >
-                              <Edit2 className="h-4 w-4" />
+                              <Edit2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-indigo-600 text-center">
-                        {visitor.accompanying_count + 1}
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap hidden lg:table-cell">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 font-semibold text-sm">
+                          {visitor.accompanying_count + 1}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
                         {!visitor.has_arrived ? (
                           <button
                             onClick={() => handleCheckIn(visitor)}
                             disabled={processingId === visitor.id}
-                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                            className="inline-flex items-center justify-center bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md space-x-1.5"
                           >
                             <UserCheck className="h-4 w-4" />
                             <span>Check In</span>
@@ -518,10 +594,10 @@ export default function ITServicesPage() {
                           <button
                             onClick={() => handleUndoCheckIn(visitor)}
                             disabled={processingId === visitor.id}
-                            className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 text-sm"
+                            className="inline-flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs space-x-1"
                           >
                             <Undo className="h-3 w-3" />
-                            <span>Undo Check-in</span>
+                            <span>Undo</span>
                           </button>
                         )}
                       </td>
@@ -531,6 +607,15 @@ export default function ITServicesPage() {
               </tbody>
             </table>
           </div>
+          
+          {/* Table Footer */}
+          {filteredVisitors.length > 0 && (
+            <div className="px-4 sm:px-6 py-4 bg-gray-50/50 border-t border-gray-100">
+              <p className="text-xs text-gray-500">
+                Showing {filteredVisitors.length} of {visitors.length} visitors
+              </p>
+            </div>
+          )}
         </motion.div>
       </div>
     </div>

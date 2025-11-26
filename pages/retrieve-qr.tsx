@@ -76,7 +76,7 @@ export default function RetrieveQR() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="container mx-auto px-4 py-6 sm:py-8">
         {!showQR ? (
           <motion.div
@@ -84,31 +84,31 @@ export default function RetrieveQR() {
             animate={{ opacity: 1, y: 0 }}
             className="max-w-md mx-auto"
           >
-            <div className="card p-4 sm:p-6">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 sm:p-8">
               {/* Icon */}
-              <div className="text-center mb-4">
-                <div className="w-16 h-16 mx-auto bg-primary-100 rounded-full flex items-center justify-center">
-                  <svg className="w-10 h-10 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <div className="text-center mb-5">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center shadow-md">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                   </svg>
                 </div>
               </div>
 
-              <h1 className="text-xl sm:text-2xl font-bold text-center text-primary-600 mb-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-2">
                 Retrieve Your QR Code
               </h1>
-              <p className="text-center text-gray-600 text-sm mb-6">
+              <p className="text-center text-gray-500 text-sm mb-6">
                 Enter your registration details to retrieve your access pass
               </p>
 
               {/* Search Method Tabs - Only Email and Phone */}
-              <div className="flex space-x-2 mb-4">
+              <div className="flex space-x-2 mb-5 p-1 bg-gray-100 rounded-xl">
                 <button
                   onClick={() => setSearchMethod('email')}
-                  className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg font-medium text-sm transition-all duration-200 ${
                     searchMethod === 'email'
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-white text-gray-800 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
                   <div className="flex items-center justify-center space-x-2">
@@ -120,10 +120,10 @@ export default function RetrieveQR() {
                 </button>
                 <button
                   onClick={() => setSearchMethod('phone')}
-                  className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg font-medium text-sm transition-all duration-200 ${
                     searchMethod === 'phone'
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-white text-gray-800 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
                   <div className="flex items-center justify-center space-x-2">
@@ -177,7 +177,7 @@ export default function RetrieveQR() {
               <button
                 onClick={() => handleRetrieve()}
                 disabled={loading || !searchValue}
-                className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
               >
                 {loading ? (
                   <span className="flex items-center justify-center">
@@ -188,19 +188,26 @@ export default function RetrieveQR() {
                     Searching...
                   </span>
                 ) : (
-                  'Retrieve QR Code'
+                  <span className="flex items-center justify-center space-x-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <span>Retrieve QR Code</span>
+                  </span>
                 )}
               </button>
 
               {/* Info Box */}
-              <div className="mt-6 p-3 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+              <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
                 <div className="flex items-start space-x-3">
-                  <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
                   <div>
-                    <p className="text-xs font-semibold text-gray-800">How to retrieve:</p>
-                    <p className="text-xs text-gray-700 mt-1">
+                    <p className="text-sm font-medium text-gray-700">How to retrieve</p>
+                    <p className="text-xs text-gray-500 mt-1">
                       Enter the same {searchMethod} you used during registration.
                     </p>
                   </div>

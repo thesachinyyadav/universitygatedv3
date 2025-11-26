@@ -36,6 +36,8 @@ export default function VisitorRegister() {
   const [error, setError] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);
+  const [otherInterest, setOtherInterest] = useState('');
+  const [showOtherInput, setShowOtherInput] = useState(false);
 
   useEffect(() => {
     fetchApprovedEvents();
@@ -61,6 +63,11 @@ export default function VisitorRegister() {
   };
 
   const handleCheckboxChange = (value: string) => {
+    // Don't add "Other" directly - it's handled separately via the text input
+    if (value === 'Other') {
+      return;
+    }
+    
     setFormData((prev) => {
       const currentInterests = prev.area_of_interest;
       if (currentInterests.includes(value)) {
@@ -305,7 +312,6 @@ export default function VisitorRegister() {
                 return selectedEvent ? (
                   <div className="mt-2 p-3 sm:p-4 bg-blue-50 rounded-lg text-xs sm:text-sm">
                     <p className="text-blue-800 font-semibold text-base sm:text-lg">{selectedEvent.event_name}</p>
-                    <p className="text-blue-600">{selectedEvent.department}</p>
                     {selectedEvent.description && (
                       <p className="text-blue-700 mt-1">{selectedEvent.description}</p>
                     )}
@@ -319,9 +325,6 @@ export default function VisitorRegister() {
                           {selectedEvent.available_slots}
                         </span>
                       </div>
-                      <p className="text-xs sm:text-sm text-green-600 mt-1">
-                        out of {selectedEvent.max_capacity} total capacity
-                      </p>
                     </div>
                   </div>
                 ) : null;
@@ -362,8 +365,26 @@ export default function VisitorRegister() {
                     >
                       <input
                         type="checkbox"
-                        checked={formData.area_of_interest.includes(interest)}
-                        onChange={() => handleCheckboxChange(interest)}
+                        checked={interest === 'Other' ? showOtherInput : formData.area_of_interest.includes(interest)}
+                        onChange={() => {
+                          if (interest === 'Other') {
+                            // Toggle the Other input visibility
+                            if (showOtherInput) {
+                              // Unchecking - remove the custom entry and hide input
+                              setFormData(prev => ({
+                                ...prev,
+                                area_of_interest: prev.area_of_interest.filter(i => i !== otherInterest.trim())
+                              }));
+                              setOtherInterest('');
+                              setShowOtherInput(false);
+                            } else {
+                              // Checking - show the input
+                              setShowOtherInput(true);
+                            }
+                          } else {
+                            handleCheckboxChange(interest);
+                          }
+                        }}
                         className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                       />
                       <span className="text-sm text-gray-700">{interest}</span>
@@ -371,6 +392,38 @@ export default function VisitorRegister() {
                   ))}
                 </div>
               </div>
+              
+              {/* Other Interest Text Input - Shows when Other checkbox is checked */}
+              {showOtherInput && (
+                <div className="mt-3">
+                  <label className="label text-xs sm:text-sm">Please specify your area of interest</label>
+                  <input
+                    type="text"
+                    value={otherInterest}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      const oldValue = otherInterest.trim();
+                      setOtherInterest(newValue);
+                      
+                      // Update area_of_interest - remove old custom value, add new one
+                      setFormData(prev => {
+                        // Remove the old custom entry only
+                        let filtered = prev.area_of_interest.filter(i => i !== oldValue);
+                        // Add the new custom entry directly if there's text
+                        if (newValue.trim()) {
+                          return { ...prev, area_of_interest: [...filtered, newValue.trim()] };
+                        }
+                        return { ...prev, area_of_interest: filtered };
+                      });
+                    }}
+                    placeholder="e.g., Architecture, Fine Arts, Sports"
+                    className="input-field text-xs sm:text-sm py-2"
+                    autoComplete="off"
+                    autoCapitalize="words"
+                  />
+                </div>
+              )}
+              
               {formData.area_of_interest.length > 0 && (
                 <p className="mt-2 text-xs text-indigo-600 font-medium">
                   Selected ({formData.area_of_interest.length}): {formData.area_of_interest.join(', ')}
