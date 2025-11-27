@@ -279,6 +279,18 @@ export default function Login() {
               <span>Back to Home</span>
             </button>
           </div>
+
+          {/* Powered by Socio */}
+          <div className="mt-6 pt-4 border-t border-gray-100 flex flex-col items-center">
+            <p className="text-[10px] text-gray-400 mb-1">Powered by</p>
+            <Image
+              src="/socio.png"
+              alt="Socio"
+              width={70}
+              height={26}
+              className="object-contain opacity-60 hover:opacity-100 transition-opacity"
+            />
+          </div>
         </Card>
       </motion.div>
     </div>

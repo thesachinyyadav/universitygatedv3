@@ -223,7 +223,24 @@ export default function Home() {
 
           {/* Compact Footer */}
           <div className="mt-6 sm:mt-8 text-center text-white/80 text-[10px] sm:text-xs px-4">
-            <p>© 2025 Christ University • Secure Gated Access Management</p>
+            <p className="mb-3">© 2025 Christ University • Secure Gated Access Management</p>
+            
+            {/* Powered by Socio */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              className="flex flex-col items-center justify-center"
+            >
+              <p className="text-white/50 text-[10px] mb-1">Powered by</p>
+              <Image
+                src="/socio.png"
+                alt="Socio - Connecting Made Simple"
+                width={80}
+                height={30}
+                className="object-contain opacity-70 hover:opacity-100 transition-opacity invert"
+              />
+            </motion.div>
           </div>
         </div>
       </div>

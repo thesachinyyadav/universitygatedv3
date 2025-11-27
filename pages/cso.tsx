@@ -696,6 +696,15 @@ export default function CSODashboard() {
           </>
         )}
       </div>
+
+      {/* Powered by Socio */}
+      <div className="mt-8 flex justify-center pb-4">
+        <img
+          src="/socio.png"
+          alt="Powered by Socio"
+          className="h-8 opacity-50 hover:opacity-100 transition-opacity"
+        />
+      </div>
     </div>
   );
 }

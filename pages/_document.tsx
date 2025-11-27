@@ -4,8 +4,6 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        {/* Viewport for PWA with safe area support */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         {/* Favicon */}
         <link rel="icon" href="/christunifavcion.png" />
         <link rel="apple-touch-icon" href="/christunifavcion.png" />

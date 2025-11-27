@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import type { Visitor } from '@/types/database';
 
 export default function VerifyPage() {
@@ -165,6 +166,18 @@ export default function VerifyPage() {
         >
           Return Home
         </button>
+
+        {/* Powered by Socio */}
+        <div className="mt-6 flex flex-col items-center">
+          <p className="text-[10px] text-gray-400 mb-1">Powered by</p>
+          <Image
+            src="/socio.png"
+            alt="Socio"
+            width={60}
+            height={23}
+            className="object-contain opacity-50"
+          />
+        </div>
       </motion.div>
     </div>
   );

@@ -1,9 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import QRScanner from '@/components/QRScanner';
-import ManualEntry from '@/components/ManualEntry';
 import type { Visitor } from '@/types/database';
+
+// Dynamic imports for heavy components - reduces initial bundle size
+const QRScanner = dynamic(() => import('@/components/QRScanner'), {
+  loading: () => (
+    <div className="card p-6 text-center">
+      <div className="animate-pulse">
+        <div className="w-16 h-16 bg-gray-200 rounded-lg mx-auto mb-3"></div>
+        <div className="h-4 bg-gray-200 rounded w-32 mx-auto"></div>
+      </div>
+    </div>
+  ),
+  ssr: false, // QR Scanner uses browser APIs
+});
+
+const ManualEntry = dynamic(() => import('@/components/ManualEntry'), {
+  loading: () => (
+    <div className="card p-4">
+      <div className="animate-pulse">
+        <div className="h-8 bg-gray-200 rounded w-40 mb-3"></div>
+        <div className="h-10 bg-gray-200 rounded w-full"></div>
+      </div>
+    </div>
+  ),
+});
 
 interface ScanHistoryItem {
   id: string;
@@ -581,6 +604,15 @@ export default function GuardDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Powered by Socio */}
+      <div className="mt-8 flex justify-center pb-4">
+        <img
+          src="/socio.png"
+          alt="Powered by Socio"
+          className="h-8 opacity-50 hover:opacity-100 transition-opacity"
+        />
+      </div>
     </div>
   );
 }

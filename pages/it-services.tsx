@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
-import Navbar from '../components/Navbar';
-import { motion } from 'framer-motion';
-import { Search, UserCheck, Users, TrendingUp, Clock, CheckCircle, XCircle, Edit2, Save, X, Target, BarChart3, Undo, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, UserCheck, Users, TrendingUp, Clock, CheckCircle, XCircle, Edit2, Save, X, Target, BarChart3, Undo, RefreshCw, Sparkles, Zap } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/Toast';
 
 // Helper function to highlight search terms
 const highlightText = (text: string, search: string) => {
@@ -54,8 +54,15 @@ interface AreaOfInterestStats {
   arrived: number;
 }
 
+interface RoomCount {
+  roomNumber: string;
+  inCount: number;
+  outCount: number;
+}
+
 export default function ITServicesPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,6 +74,26 @@ export default function ITServicesPage() {
   const [editCompanions, setEditCompanions] = useState<number>(0);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [justCheckedIn, setJustCheckedIn] = useState<string | null>(null);
+  
+  // Lobby tracking state (read-only for display, synced from database via API)
+  const [roomCounts, setRoomCounts] = useState<Record<string, RoomCount>>({
+    'Lobby 1': { roomNumber: 'Lobby 1', inCount: 0, outCount: 0 },
+    'Lobby 2': { roomNumber: 'Lobby 2', inCount: 0, outCount: 0 },
+    'Lobby 3': { roomNumber: 'Lobby 3', inCount: 0, outCount: 0 },
+  });
+  
+  // Quick registration state
+  const [showQuickRegister, setShowQuickRegister] = useState(false);
+  const [quickRegForm, setQuickRegForm] = useState({
+    name: '',
+    phone: '',
+    event_name: '',
+    accompanying_count: 0,
+    area_of_interest: [] as string[],
+  });
+  const [isQuickRegistering, setIsQuickRegistering] = useState(false);
+  const [approvedEvents, setApprovedEvents] = useState<any[]>([]);
 
   useEffect(() => {
     checkUser();
@@ -77,6 +104,8 @@ export default function ITServicesPage() {
       fetchVisitors();
       fetchStats();
       fetchAreaStats();
+      fetchApprovedEvents();
+      loadRoomCounts();
     }
   }, [user]);
 
@@ -206,6 +235,95 @@ export default function ITServicesPage() {
     }
   };
 
+  const fetchApprovedEvents = async () => {
+    try {
+      const response = await fetch('/api/approved-events');
+      const data = await response.json();
+      setApprovedEvents(data.events || []);
+    } catch (error) {
+      console.error('Error fetching approved events:', error);
+    }
+  };
+
+  const loadRoomCounts = async () => {
+    try {
+      const response = await fetch('/api/lobby/status');
+      const data = await response.json();
+      if (data.success && data.lobbies) {
+        const counts: Record<string, RoomCount> = {};
+        data.lobbies.forEach((lobby: any) => {
+          counts[lobby.lobby_name] = {
+            roomNumber: lobby.lobby_name,
+            inCount: lobby.current_count,
+            outCount: lobby.total_sent_out,
+          };
+        });
+        setRoomCounts(counts);
+      }
+    } catch (error) {
+      console.error('Error loading lobby counts:', error);
+    }
+  };
+
+  // Periodically sync lobby counts from database
+  useEffect(() => {
+    if (!user) return;
+    loadRoomCounts(); // Initial load
+    const intervalId = setInterval(() => {
+      loadRoomCounts();
+    }, 5000); // Refresh every 5 seconds
+    return () => clearInterval(intervalId);
+  }, [user]);
+
+  const handleQuickRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickRegForm.name || !quickRegForm.event_name) {
+      showToast('Please enter name and select an event', 'error');
+      return;
+    }
+
+    if (quickRegForm.area_of_interest.length === 0) {
+      showToast('Please select at least one area of interest', 'error');
+      return;
+    }
+
+    setIsQuickRegistering(true);
+    try {
+      const selectedEvent = approvedEvents.find(e => e.event_name === quickRegForm.event_name);
+      const response = await fetch('/api/registerVisitor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: quickRegForm.name,
+          phone: quickRegForm.phone || '',
+          email: '',
+          event_id: selectedEvent?.id || '',
+          event_name: quickRegForm.event_name,
+          date_of_visit_from: selectedEvent?.date_from || new Date().toISOString(),
+          date_of_visit_to: selectedEvent?.date_to || new Date().toISOString(),
+          visitor_category: 'student',
+          purpose: 'On-spot registration by IT Services',
+          accompanying_count: quickRegForm.accompanying_count,
+          area_of_interest: quickRegForm.area_of_interest,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Registration failed');
+
+      // Reset form and refresh
+      setQuickRegForm({ name: '', phone: '', event_name: '', accompanying_count: 0, area_of_interest: [] });
+      setShowQuickRegister(false);
+      await fetchVisitors();
+      await fetchStats();
+      showToast(`${quickRegForm.name} registered successfully!`, 'success');
+    } catch (error) {
+      console.error('Error in quick registration:', error);
+      showToast('Failed to register visitor', 'error');
+    } finally {
+      setIsQuickRegistering(false);
+    }
+  };
+
   const handleCheckIn = async (visitor: Visitor) => {
     if (processingId) return;
 
@@ -223,6 +341,10 @@ export default function ITServicesPage() {
 
       if (error) throw error;
 
+      // Show success animation
+      setJustCheckedIn(visitor.id);
+      setTimeout(() => setJustCheckedIn(null), 2000);
+
       // Refresh data
       await fetchVisitors();
       await fetchStats();
@@ -230,8 +352,11 @@ export default function ITServicesPage() {
 
       // Clear search field for next visitor
       setSearchTerm('');
+      
+      showToast(`${visitor.name} checked in successfully!`, 'success');
     } catch (error) {
       console.error('Error checking in visitor:', error);
+      showToast('Failed to check in visitor', 'error');
     } finally {
       setProcessingId(null);
     }
@@ -262,8 +387,11 @@ export default function ITServicesPage() {
 
       // Clear search field for next visitor
       setSearchTerm('');
+      
+      showToast(`Check-in undone for ${visitor.name}`, 'info');
     } catch (error) {
       console.error('Error undoing check-in:', error);
+      showToast('Failed to undo check-in', 'error');
     } finally {
       setProcessingId(null);
     }
@@ -299,8 +427,11 @@ export default function ITServicesPage() {
       await fetchStats();
       await fetchAreaStats();
       setEditingId(null);
+      
+      showToast(`Companion count updated for ${visitorName}`, 'success');
     } catch (error) {
       console.error('Error updating companions:', error);
+      showToast('Failed to update companion count', 'error');
     } finally {
       setProcessingId(null);
     }
@@ -309,12 +440,32 @@ export default function ITServicesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg mb-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
-          </div>
-          <p className="text-gray-500 font-medium">Loading dashboard...</p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <motion.div 
+            animate={{ 
+              rotate: [0, 360],
+              scale: [1, 1.05, 1]
+            }}
+            transition={{ 
+              rotate: { duration: 2, repeat: Infinity, ease: "linear" },
+              scale: { duration: 1, repeat: Infinity, ease: "easeInOut" }
+            }}
+            className="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-2xl mb-6"
+          >
+            <Sparkles className="h-10 w-10 text-white" />
+          </motion.div>
+          <motion.p 
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="text-gray-600 font-semibold text-lg"
+          >
+            Loading dashboard...
+          </motion.p>
+        </motion.div>
       </div>
     );
   }
@@ -351,7 +502,7 @@ export default function ITServicesPage() {
           </div>
         </motion.div>
 
-        {/* Search Section */}
+        {/* Quick Register & Search Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -364,19 +515,158 @@ export default function ITServicesPage() {
               </div>
               <h2 className="text-lg font-semibold text-gray-800">Search Visitors</h2>
             </div>
-            <button
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-xl font-medium transition-all text-sm ${
-                isRefreshing
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowQuickRegister(!showQuickRegister)}
+                className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl font-medium transition-all text-sm bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-sm hover:shadow-md"
+              >
+                <UserCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">Quick Register</span>
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-xl font-medium transition-all text-sm ${
+                  isRefreshing
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 shadow-sm hover:shadow'
+                }`}
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </motion.button>
+            </div>
           </div>
+
+          {/* Quick Registration Form */}
+          <AnimatePresence>
+            {showQuickRegister && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -20 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="mb-4 p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl shadow-sm"
+              >
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className="w-6 h-6 bg-green-500 rounded-lg flex items-center justify-center">
+                    <Sparkles className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <h3 className="text-sm font-bold text-green-800">On-Spot Registration</h3>
+                </div>
+              <form onSubmit={handleQuickRegister} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Name *"
+                    value={quickRegForm.name}
+                    onChange={(e) => setQuickRegForm({ ...quickRegForm, name: e.target.value })}
+                    required
+                    className="px-3 py-2 bg-white border border-green-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Phone (optional)"
+                    value={quickRegForm.phone}
+                    onChange={(e) => setQuickRegForm({ ...quickRegForm, phone: e.target.value })}
+                    className="px-3 py-2 bg-white border border-green-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <select
+                    value={quickRegForm.event_name}
+                    onChange={(e) => setQuickRegForm({ ...quickRegForm, event_name: e.target.value })}
+                    required
+                    className="px-3 py-2 bg-white border border-green-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="">Select Event *</option>
+                    {approvedEvents.map(event => (
+                      <option key={event.id} value={event.event_name}>{event.event_name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    placeholder="Companions"
+                    min="0"
+                    value={quickRegForm.accompanying_count}
+                    onChange={(e) => setQuickRegForm({ ...quickRegForm, accompanying_count: parseInt(e.target.value) || 0 })}
+                    className="px-3 py-2 bg-white border border-green-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <select
+                    value={quickRegForm.area_of_interest[0] || ''}
+                    onChange={(e) => setQuickRegForm({ ...quickRegForm, area_of_interest: e.target.value ? [e.target.value] : [] })}
+                    required
+                    className="px-3 py-2 bg-white border border-green-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="">Area of Interest *</option>
+                    <option value="English and Cultural Studies">English & Cultural Studies</option>
+                    <option value="Media Studies">Media Studies</option>
+                    <option value="Performing Arts">Performing Arts</option>
+                    <option value="Business and Management">Business & Management</option>
+                    <option value="Hotel Management">Hotel Management</option>
+                    <option value="Commerce">Commerce</option>
+                    <option value="Professional Studies">Professional Studies</option>
+                    <option value="Education">Education</option>
+                    <option value="Law">Law</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Life Sciences">Life Sciences</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Physics and Electronics">Physics & Electronics</option>
+                    <option value="Statistics and Data Science">Statistics & Data Science</option>
+                    <option value="Economics">Economics</option>
+                    <option value="International Studies">International Studies</option>
+                    <option value="Psychology">Psychology</option>
+                    <option value="Sociology and Social Work">Sociology & Social Work</option>
+                    <option value="Languages">Languages</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => {
+                      setShowQuickRegister(false);
+                      setQuickRegForm({ name: '', phone: '', event_name: '', accompanying_count: 0, area_of_interest: [] });
+                    }}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={isQuickRegistering}
+                    className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg text-sm hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 shadow-sm hover:shadow-md transition-all flex items-center space-x-2"
+                  >
+                    {isQuickRegistering ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </motion.div>
+                        <span>Registering...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        <span>Register</span>
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
@@ -402,31 +692,94 @@ export default function ITServicesPage() {
           )}
         </motion.div>
 
-        {/* Quick Stats Bar */}
+        {/* Quick Stats */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6"
+          className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6"
         >
-          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Total</p>
-            <p className="text-2xl font-bold text-gray-800 mt-1">{visitors.length}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Checked In</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">{visitors.filter(v => v.has_arrived).length}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Pending</p>
-            <p className="text-2xl font-bold text-amber-600 mt-1">{visitors.filter(v => !v.has_arrived).length}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Arrival Rate</p>
-            <p className="text-2xl font-bold text-indigo-600 mt-1">
-              {visitors.length > 0 ? Math.round((visitors.filter(v => v.has_arrived).length / visitors.length) * 100) : 0}%
-            </p>
-          </div>
+          <motion.div 
+            whileHover={{ scale: 1.02, y: -4 }}
+            className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all cursor-default"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Total</p>
+              <Users className="h-4 w-4 text-gray-400" />
+            </div>
+            <motion.p 
+              key={visitors.length}
+              initial={{ scale: 1.2, color: '#6366f1' }}
+              animate={{ scale: 1, color: '#1f2937' }}
+              className="text-3xl font-bold mt-1"
+            >
+              {visitors.length}
+            </motion.p>
+          </motion.div>
+          
+          <motion.div 
+            whileHover={{ scale: 1.02, y: -4 }}
+            className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100 p-4 shadow-sm hover:shadow-md transition-all cursor-default"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-green-700 uppercase tracking-wider font-medium">Checked In</p>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </div>
+            <motion.p 
+              key={visitors.filter(v => v.has_arrived).length}
+              initial={{ scale: 1.2, color: '#10b981' }}
+              animate={{ scale: 1, color: '#059669' }}
+              className="text-3xl font-bold mt-1"
+            >
+              {visitors.filter(v => v.has_arrived).length}
+            </motion.p>
+          </motion.div>
+          
+          <motion.div 
+            whileHover={{ scale: 1.02, y: -4 }}
+            className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100 p-4 shadow-sm hover:shadow-md transition-all cursor-default"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-amber-700 uppercase tracking-wider font-medium">Pending</p>
+              <Clock className="h-4 w-4 text-amber-500" />
+            </div>
+            <motion.p 
+              key={visitors.filter(v => !v.has_arrived).length}
+              initial={{ scale: 1.2, color: '#f59e0b' }}
+              animate={{ scale: 1, color: '#d97706' }}
+              className="text-3xl font-bold mt-1"
+            >
+              {visitors.filter(v => !v.has_arrived).length}
+            </motion.p>
+          </motion.div>
+          
+          <Link href="/it-services/lobby-tracking">
+            <motion.div 
+              whileHover={{ scale: 1.05, y: -4 }}
+              whileTap={{ scale: 0.98 }}
+              className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 rounded-xl p-4 shadow-lg cursor-pointer hover:shadow-xl transition-all relative overflow-hidden border border-slate-600"
+            >
+              <motion.div 
+                animate={{ 
+                  scale: [1, 1.2, 1],
+                  opacity: [0.1, 0.2, 0.1]
+                }}
+                transition={{ duration: 3, repeat: Infinity }}
+                className="absolute inset-0 bg-white rounded-xl"
+              />
+              <div className="relative z-10">
+                <p className="text-xs text-slate-300 uppercase tracking-wider font-medium flex items-center mb-1">
+                  <Target className="w-4 h-4 mr-1" />
+                  Lobby Management
+                </p>
+                <p className="text-3xl font-bold text-white flex items-center">
+                  {Object.values(roomCounts).reduce((sum, room) => sum + room.inCount, 0)} 
+                  <span className="text-lg ml-1 opacity-90">IN</span>
+                  <Zap className="h-5 w-5 ml-2 animate-pulse text-yellow-400" />
+                </p>
+              </div>
+            </motion.div>
+          </Link>
         </motion.div>
 
         {/* Visitors Table */}
@@ -486,15 +839,30 @@ export default function ITServicesPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredVisitors.map((visitor) => (
-                    <tr key={visitor.id} className="hover:bg-gray-50/50 transition-colors">
+                  filteredVisitors.map((visitor, index) => (
+                    <motion.tr 
+                      key={visitor.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.02 }}
+                      className={`hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/50 transition-all border-l-4 ${
+                        justCheckedIn === visitor.id 
+                          ? 'border-l-green-500 bg-green-50/30' 
+                          : 'border-l-transparent'
+                      }`}
+                    >
                       <td className="px-4 sm:px-6 py-4">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold text-sm ${
-                            visitor.has_arrived ? 'bg-gradient-to-br from-green-400 to-green-600' : 'bg-gradient-to-br from-gray-300 to-gray-400'
-                          }`}>
+                          <motion.div 
+                            whileHover={{ scale: 1.1, rotate: 5 }}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold text-sm shadow-md ${
+                              visitor.has_arrived 
+                                ? 'bg-gradient-to-br from-green-400 to-green-600' 
+                                : 'bg-gradient-to-br from-gray-300 to-gray-400'
+                            }`}
+                          >
                             {visitor.name.charAt(0).toUpperCase()}
-                          </div>
+                          </motion.div>
                           <div>
                             <div className="text-sm font-semibold text-gray-900">
                               {highlightText(visitor.name, searchTerm)}
@@ -523,7 +891,7 @@ export default function ITServicesPage() {
                               <CheckCircle className="h-3.5 w-3.5 mr-1" />
                               Arrived
                             </span>
-                            <span className="text-xs text-gray-400 mt-1">
+                            <span className="text-sm text-gray-700 font-semibold mt-1">
                               {new Date(visitor.arrived_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
@@ -582,26 +950,41 @@ export default function ITServicesPage() {
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
                         {!visitor.has_arrived ? (
-                          <button
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => handleCheckIn(visitor)}
                             disabled={processingId === visitor.id}
-                            className="inline-flex items-center justify-center bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md space-x-1.5"
+                            className="inline-flex items-center justify-center bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-lg space-x-1.5"
                           >
-                            <UserCheck className="h-4 w-4" />
-                            <span>Check In</span>
-                          </button>
+                            {processingId === visitor.id ? (
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </motion.div>
+                            ) : (
+                              <>
+                                <UserCheck className="h-4 w-4" />
+                                <span>Check In</span>
+                              </>
+                            )}
+                          </motion.button>
                         ) : (
-                          <button
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => handleUndoCheckIn(visitor)}
                             disabled={processingId === visitor.id}
                             className="inline-flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs space-x-1"
                           >
                             <Undo className="h-3 w-3" />
                             <span>Undo</span>
-                          </button>
+                          </motion.button>
                         )}
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))
                 )}
               </tbody>
@@ -617,6 +1000,15 @@ export default function ITServicesPage() {
             </div>
           )}
         </motion.div>
+
+        {/* Powered by Socio */}
+        <div className="mt-8 flex justify-center pb-4">
+          <img
+            src="/socio.png"
+            alt="Powered by Socio"
+            className="h-8 opacity-50 hover:opacity-100 transition-opacity"
+          />
+        </div>
       </div>
     </div>
   );

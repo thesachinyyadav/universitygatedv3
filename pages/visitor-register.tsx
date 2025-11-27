@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import QRGenerator from '@/components/QRGenerator';
 import PhotoCapture from '@/components/PhotoCapture';
 
@@ -554,6 +555,23 @@ export default function VisitorRegister() {
             </motion.div>
           </div>
         )}
+
+        {/* Footer with Socio Branding */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-8 pb-6 flex flex-col items-center justify-center"
+        >
+          <p className="text-[10px] text-gray-400 mb-1">Powered by</p>
+          <Image
+            src="/socio.png"
+            alt="Socio"
+            width={70}
+            height={26}
+            className="object-contain opacity-50 hover:opacity-80 transition-opacity"
+          />
+        </motion.div>
       </div>
     </div>
   );

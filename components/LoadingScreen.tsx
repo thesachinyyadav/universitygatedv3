@@ -3,8 +3,8 @@ import Image from 'next/image';
 
 export default function LoadingScreen() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-tertiary-50">
-      <div className="text-center">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-primary-50 via-white to-tertiary-50">
+      <div className="text-center flex-1 flex flex-col items-center justify-center">
         {/* Animated Logo */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -113,6 +113,27 @@ export default function LoadingScreen() {
           Loading...
         </motion.p>
       </div>
+
+      {/* Powered by Socio - Fixed at bottom */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: 0.5,
+          delay: 0.8,
+          ease: "easeOut"
+        }}
+        className="pb-8"
+      >
+        <p className="text-xs text-gray-400 mb-2 text-center">Powered by</p>
+        <Image
+          src="/socio.png"
+          alt="Socio"
+          width={100}
+          height={38}
+          className="object-contain opacity-80 hover:opacity-100 transition-opacity"
+        />
+      </motion.div>
     </div>
   );
 }

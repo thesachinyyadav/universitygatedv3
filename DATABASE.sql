@@ -767,6 +767,197 @@ COMMENT ON COLUMN system_logs.action IS 'Type of system action performed';
 COMMENT ON COLUMN system_logs.details IS 'JSONB field containing detailed action metadata';
 
 -- =====================================================
+-- LOBBY TRACKING & BATCH EXIT SYSTEM
+-- =====================================================
+
+-- Create lobby tracking table for visitor batch management
+CREATE TABLE IF NOT EXISTS lobby_tracking (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    lobby_name VARCHAR(50) NOT NULL UNIQUE,
+    current_count INTEGER DEFAULT 0,
+    total_checked_in INTEGER DEFAULT 0,
+    total_sent_out INTEGER DEFAULT 0,
+    last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_by UUID REFERENCES users(id)
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_lobby_tracking_name ON lobby_tracking(lobby_name);
+
+-- Insert initial lobby records
+INSERT INTO lobby_tracking (lobby_name, current_count, total_checked_in, total_sent_out) 
+VALUES 
+    ('Lobby 1', 0, 0, 0),
+    ('Lobby 2', 0, 0, 0),
+    ('Lobby 3', 0, 0, 0)
+ON CONFLICT (lobby_name) DO NOTHING;
+
+-- Create batch exits table with volunteer tracking
+CREATE TABLE IF NOT EXISTS batch_exits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    lobby_name VARCHAR(50) NOT NULL,
+    batch_number INTEGER NOT NULL,
+    people_count INTEGER NOT NULL,
+    volunteers JSONB NOT NULL, -- Array of {name, register_number}
+    notes TEXT,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT check_people_count CHECK (people_count > 0)
+);
+
+-- Create indexes for batch exits
+CREATE INDEX IF NOT EXISTS idx_batch_exits_lobby ON batch_exits(lobby_name);
+CREATE INDEX IF NOT EXISTS idx_batch_exits_date ON batch_exits(created_at);
+CREATE INDEX IF NOT EXISTS idx_batch_exits_batch_number ON batch_exits(batch_number);
+
+-- Add lobby assignment columns to visitors table
+ALTER TABLE visitors ADD COLUMN IF NOT EXISTS assigned_lobby VARCHAR(50) DEFAULT 'Lobby 1';
+ALTER TABLE visitors ADD COLUMN IF NOT EXISTS lobby_entry_time TIMESTAMP WITH TIME ZONE;
+
+-- Function to get next batch number (resets daily)
+CREATE OR REPLACE FUNCTION get_next_batch_number()
+RETURNS INTEGER AS $$
+DECLARE
+    next_number INTEGER;
+BEGIN
+    SELECT COALESCE(MAX(batch_number), 0) + 1 INTO next_number
+    FROM batch_exits
+    WHERE DATE(created_at) = CURRENT_DATE
+    AND batch_number > 0;
+    
+    IF next_number IS NULL THEN
+        next_number := 1;
+    END IF;
+    
+    RETURN next_number;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to auto-increment lobby count on check-in
+CREATE OR REPLACE FUNCTION auto_increment_lobby_on_checkin()
+RETURNS TRIGGER AS $$
+DECLARE
+    people_count INTEGER;
+BEGIN
+    IF NEW.has_arrived = true AND (OLD.has_arrived = false OR OLD.has_arrived IS NULL) THEN
+        people_count := 1 + COALESCE(NEW.accompanying_count, 0);
+        NEW.lobby_entry_time := NOW();
+        
+        IF NEW.assigned_lobby IS NULL THEN
+            NEW.assigned_lobby := 'Lobby 1';
+        END IF;
+        
+        UPDATE lobby_tracking
+        SET 
+            current_count = current_count + people_count,
+            total_checked_in = total_checked_in + people_count,
+            last_updated = NOW()
+        WHERE lobby_name = NEW.assigned_lobby;
+        
+        IF NOT FOUND THEN
+            INSERT INTO lobby_tracking (lobby_name, current_count, total_checked_in, total_sent_out)
+            VALUES (NEW.assigned_lobby, people_count, people_count, 0);
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for auto-increment on check-in
+DROP TRIGGER IF EXISTS trigger_auto_increment_lobby ON visitors;
+CREATE TRIGGER trigger_auto_increment_lobby
+BEFORE UPDATE ON visitors
+FOR EACH ROW
+EXECUTE FUNCTION auto_increment_lobby_on_checkin();
+
+-- Function to create batch exit
+CREATE OR REPLACE FUNCTION create_batch_exit(
+    p_lobby_name VARCHAR(50),
+    p_people_count INTEGER,
+    p_volunteers JSONB,
+    p_user_id UUID,
+    p_notes TEXT DEFAULT NULL
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_current_count INTEGER;
+    v_batch_number INTEGER;
+    v_result JSONB;
+BEGIN
+    IF p_volunteers IS NULL OR jsonb_array_length(p_volunteers) = 0 THEN
+        RAISE EXCEPTION 'At least one volunteer is required';
+    END IF;
+    
+    SELECT current_count INTO v_current_count
+    FROM lobby_tracking
+    WHERE lobby_name = p_lobby_name;
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Lobby % not found', p_lobby_name;
+    END IF;
+    
+    IF v_current_count < p_people_count THEN
+        RAISE EXCEPTION 'Not enough people in lobby. Current: %, Requested: %', v_current_count, p_people_count;
+    END IF;
+    
+    v_batch_number := get_next_batch_number();
+    
+    UPDATE lobby_tracking
+    SET 
+        current_count = current_count - p_people_count,
+        total_sent_out = total_sent_out + p_people_count,
+        last_updated = NOW(),
+        updated_by = p_user_id
+    WHERE lobby_name = p_lobby_name;
+    
+    INSERT INTO batch_exits (lobby_name, batch_number, people_count, volunteers, notes, created_by)
+    VALUES (p_lobby_name, v_batch_number, p_people_count, p_volunteers, p_notes, p_user_id)
+    RETURNING 
+        jsonb_build_object(
+            'id', id,
+            'batch_number', batch_number,
+            'lobby_name', lobby_name,
+            'people_count', people_count,
+            'volunteers', volunteers,
+            'created_at', created_at
+        ) INTO v_result;
+    
+    RETURN v_result;
+END;
+$$ LANGUAGE plpgsql;
+
+-- View: Current lobby status
+CREATE OR REPLACE VIEW lobby_status AS
+SELECT 
+    lobby_name,
+    current_count,
+    total_checked_in,
+    total_sent_out,
+    (total_checked_in - total_sent_out) as should_be_count,
+    last_updated,
+    EXTRACT(EPOCH FROM (NOW() - last_updated))/60 as minutes_since_update
+FROM lobby_tracking
+ORDER BY lobby_name;
+
+-- View: Batch history (all dates)
+CREATE OR REPLACE VIEW batch_history AS
+SELECT 
+    be.id,
+    be.batch_number,
+    be.lobby_name,
+    be.people_count,
+    be.volunteers,
+    be.notes,
+    be.created_at,
+    u.username as created_by_username,
+    lt.current_count as lobby_current_count
+FROM batch_exits be
+LEFT JOIN users u ON be.created_by = u.id
+LEFT JOIN lobby_tracking lt ON be.lobby_name = lt.lobby_name
+ORDER BY be.created_at DESC;
+
+-- =====================================================
 -- STORAGE BUCKET FOR VISITOR PHOTOS
 -- =====================================================
 
