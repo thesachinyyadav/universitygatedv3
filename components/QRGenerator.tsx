@@ -103,19 +103,24 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
     try {
       console.log('[PDF_DOWNLOAD] Starting PDF generation...');
       
-      // Load the Christ University logo
-      const logoImg = new Image();
-      logoImg.src = '/christunilogo.png';
-      
-      await new Promise((resolve, reject) => {
-        logoImg.onload = resolve;
-        logoImg.onerror = () => {
-          console.warn('[PDF_DOWNLOAD] Logo failed to load, continuing without logo');
-          resolve(null);
-        };
-        // Timeout after 2 seconds if logo doesn't load
-        setTimeout(resolve, 2000);
-      });
+      // Load the Christ University logo (only in browser)
+      let logoImg: HTMLImageElement | null = null;
+      if (typeof window !== 'undefined') {
+        logoImg = new window.Image();
+        logoImg.src = '/christunilogo.png';
+        
+        await new Promise((resolve, reject) => {
+          if (logoImg) {
+            logoImg.onload = resolve;
+            logoImg.onerror = () => {
+              console.warn('[PDF_DOWNLOAD] Logo failed to load, continuing without logo');
+              resolve(null);
+            };
+          }
+          // Timeout after 2 seconds if logo doesn't load
+          setTimeout(resolve, 2000);
+        });
+      }
 
       const pdf = new jsPDF({
         orientation: 'portrait',

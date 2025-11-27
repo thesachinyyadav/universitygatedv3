@@ -2,6 +2,7 @@ import '@/styles/globals.css'
 import { useState, useEffect } from 'react'
 import type { AppProps } from 'next/app'
 import { useRouter } from 'next/router'
+import Head from 'next/head'
 import { SWRConfig } from 'swr'
 import Navbar from '@/components/Navbar'
 import PWAProvider from '@/components/PWAProvider'
@@ -91,14 +92,21 @@ export default function App({ Component, pageProps }: AppProps) {
   }, [router])
 
   return (
-    <SWRConfig value={swrConfig}>
-      <PWAProvider>
-        <ToastProvider>
-          {loading && <LoadingScreen />}
-          <Navbar />
-          <Component {...pageProps} />
-        </ToastProvider>
-      </PWAProvider>
-    </SWRConfig>
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover" />
+        <link rel="preconnect" href="https://mzrfwdjapeoiqgvtifkc.supabase.co" />
+        <link rel="dns-prefetch" href="https://mzrfwdjapeoiqgvtifkc.supabase.co" />
+      </Head>
+      <SWRConfig value={swrConfig}>
+        <PWAProvider>
+          <ToastProvider>
+            {loading && <LoadingScreen />}
+            <Navbar />
+            <Component {...pageProps} />
+          </ToastProvider>
+        </PWAProvider>
+      </SWRConfig>
+    </>
   )
 }

@@ -13,11 +13,15 @@ const STATIC_ASSETS = [
   '/retrieve-qr',
   '/login',
   '/guard',
+  '/verify',
+  '/404',
   '/christunilogo.png',
   '/christunifavcion.png',
+  '/socio.png',
   '/securityimage.jpg',
   '/icon-192x192.png',
   '/icon-512x512.png',
+  '/icon-384x384.png',
   '/manifest.json'
 ];
 
