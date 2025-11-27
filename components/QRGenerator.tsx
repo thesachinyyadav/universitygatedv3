@@ -138,7 +138,7 @@ export default function QRGenerator({ visitorId, visitorName }: QRGeneratorProps
       pdf.rect(10, 10, 190, 35, 'S');
       
       // Add Christ University Logo (left corner inside border)
-      if (logoImg.complete && logoImg.naturalHeight !== 0) {
+      if (logoImg && logoImg.complete && logoImg.naturalHeight !== 0) {
         try {
           // Use actual image aspect ratio to avoid distortion
           const imgWidth = logoImg.naturalWidth;
