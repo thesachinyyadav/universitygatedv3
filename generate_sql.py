@@ -110,13 +110,13 @@ def validate_email(email):
     return None
 
 # Read CSV and process
-csv_file = r'd:\BCA\christuniversitygated\v3\ConfirmationMail _Openday 2025_November (1).csv'
+csv_file = r'd:\2341551\universitygated\v3.2\universitygatedv3\ConfirmationMail _Openday 2025_November (1).csv'
 
 sql_statements = []
 
 with open(csv_file, 'r', encoding='utf-8') as f:
     reader = csv.DictReader(f)
-    rows = list(reader)[:100]  # First 100 rows only
+    rows = list(reader)[634:]  # Start from line 635 (index 634)
     
     for row in rows:
         # Generate UUID
@@ -145,7 +145,7 @@ with open(csv_file, 'r', encoding='utf-8') as f:
         sql_statements.append(sql)
 
 # Write to output file
-output_file = r'd:\BCA\christuniversitygated\v3\generated_sql_output.txt'
+output_file = r'd:\2341551\universitygated\v3.2\universitygatedv3\generated_sql_output_annu.txt'
 with open(output_file, 'w', encoding='utf-8') as f:
     f.write('\n'.join(sql_statements))
 

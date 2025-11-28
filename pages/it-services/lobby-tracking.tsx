@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, RotateCcw, Users, Clock, Send, UserPlus, Trash2, ChevronDown, ChevronUp, Sparkles, TrendingUp, AlertCircle } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Users, Clock, Send, UserPlus, Trash2, ChevronDown, ChevronUp, Sparkles, TrendingUp, AlertCircle, Pencil, Check, X } from 'lucide-react';
 import { useLobbyStatus, useBatchHistory, invalidateCache } from '@/lib/hooks/useSWRCache';
 import { useToast } from '@/components/ui/Toast';
 
@@ -53,6 +53,11 @@ export default function RoomTracking() {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([{ name: '', register_number: '' }]);
   const [isCreatingBatch, setIsCreatingBatch] = useState(false);
   const [expandedBatch, setExpandedBatch] = useState<string | null>(null);
+  
+  // Edit lobby count state
+  const [editingLobby, setEditingLobby] = useState<string | null>(null);
+  const [editCount, setEditCount] = useState<number>(0);
+  const [isUpdatingCount, setIsUpdatingCount] = useState(false);
 
   useEffect(() => {
     checkUser();
@@ -163,6 +168,47 @@ export default function RoomTracking() {
 
   const getTotalInLobbies = () => {
     return lobbies.reduce((sum, lobby) => sum + lobby.current_count, 0);
+  };
+
+  const startEditingLobby = (lobbyName: string, currentCount: number) => {
+    setEditingLobby(lobbyName);
+    setEditCount(currentCount);
+  };
+
+  const cancelEditingLobby = () => {
+    setEditingLobby(null);
+    setEditCount(0);
+  };
+
+  const saveEditedCount = async (lobbyName: string) => {
+    if (editCount < 0) {
+      showToast('Count cannot be negative', 'error');
+      return;
+    }
+    
+    setIsUpdatingCount(true);
+    try {
+      const response = await fetch('/api/lobby/update-count', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lobby_name: lobbyName,
+          new_count: editCount,
+          user_id: user?.id,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update count');
+      
+      await refreshLobbies();
+      showToast(`${lobbyName} count updated successfully`, 'success');
+      setEditingLobby(null);
+    } catch (error) {
+      console.error('Error updating lobby count:', error);
+      showToast('Failed to update count', 'error');
+    } finally {
+      setIsUpdatingCount(false);
+    }
   };
 
   const getCurrentLobby = () => {
@@ -278,14 +324,18 @@ export default function RoomTracking() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              whileHover={{ scale: 1.02, y: -4 }}
-              whileTap={{ scale: 0.98 }}
-              className={`rounded-xl shadow-lg p-6 border-2 cursor-pointer transition-all ${
+              whileHover={{ scale: editingLobby === lobby.lobby_name ? 1 : 1.02, y: editingLobby === lobby.lobby_name ? 0 : -4 }}
+              whileTap={{ scale: editingLobby === lobby.lobby_name ? 1 : 0.98 }}
+              className={`rounded-xl shadow-lg p-6 border-2 transition-all ${
                 selectedLobby === lobby.lobby_name 
                   ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-400 shadow-green-200/50' 
                   : 'bg-white border-gray-200 hover:border-indigo-300 hover:shadow-xl'
-              }`}
-              onClick={() => setSelectedLobby(lobby.lobby_name)}
+              } ${editingLobby === lobby.lobby_name ? '' : 'cursor-pointer'}`}
+              onClick={() => {
+                if (editingLobby !== lobby.lobby_name) {
+                  setSelectedLobby(lobby.lobby_name);
+                }
+              }}
             >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-semibold flex items-center ${
@@ -294,18 +344,72 @@ export default function RoomTracking() {
                   {selectedLobby === lobby.lobby_name && <TrendingUp className="w-4 h-4 mr-1" />}
                   {lobby.lobby_name}
                 </p>
-                <Clock className={`w-4 h-4 ${
-                  selectedLobby === lobby.lobby_name ? 'text-green-500' : 'text-gray-400'
-                }`} />
+                <div className="flex items-center space-x-1">
+                  {editingLobby === lobby.lobby_name ? (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          saveEditedCount(lobby.lobby_name);
+                        }}
+                        disabled={isUpdatingCount}
+                        className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+                        title="Save"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cancelEditingLobby();
+                        }}
+                        className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                        title="Cancel"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditingLobby(lobby.lobby_name, lobby.current_count);
+                        }}
+                        className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                        title="Edit count"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <Clock className={`w-4 h-4 ${
+                        selectedLobby === lobby.lobby_name ? 'text-green-500' : 'text-gray-400'
+                      }`} />
+                    </>
+                  )}
+                </div>
               </div>
-              <motion.p 
-                key={lobby.current_count}
-                initial={{ scale: 1.2, color: selectedLobby === lobby.lobby_name ? '#059669' : '#6366f1' }}
-                animate={{ scale: 1, color: '#111827' }}
-                className="text-4xl font-bold"
-              >
-                {lobby.current_count}
-              </motion.p>
+              
+              {editingLobby === lobby.lobby_name ? (
+                <input
+                  type="number"
+                  min="0"
+                  value={editCount}
+                  onChange={(e) => setEditCount(parseInt(e.target.value) || 0)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full text-4xl font-bold bg-white border-2 border-indigo-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  autoFocus
+                />
+              ) : (
+                <motion.p 
+                  key={lobby.current_count}
+                  initial={{ scale: 1.2, color: selectedLobby === lobby.lobby_name ? '#059669' : '#6366f1' }}
+                  animate={{ scale: 1, color: '#111827' }}
+                  className="text-4xl font-bold"
+                >
+                  {lobby.current_count}
+                </motion.p>
+              )}
+              
               <p className="text-xs text-gray-500 mt-1">Currently inside</p>
               <p className="text-xs font-medium mt-1 ${
                 selectedLobby === lobby.lobby_name ? 'text-green-600' : 'text-gray-600'
