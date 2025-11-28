@@ -67,10 +67,10 @@ export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
 
   useEffect(() => {
-    // Initial loading - reduced to 800ms for better UX
+    // Initial loading - 2000ms to ensure Socio branding visibility
     const timer = setTimeout(() => {
       setLoading(false)
-    }, 800)
+    }, 2000)
 
     return () => clearTimeout(timer)
   }, [])
