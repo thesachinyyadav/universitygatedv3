@@ -119,8 +119,8 @@ export default function LoadingScreen() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{
-          duration: 0.5,
-          delay: 0.8,
+          duration: 0.3,
+          delay: 0.1,
           ease: "easeOut"
         }}
         className="pb-8"
@@ -132,6 +132,7 @@ export default function LoadingScreen() {
           width={100}
           height={38}
           className="object-contain opacity-80 hover:opacity-100 transition-opacity"
+          priority
         />
       </motion.div>
     </div>
