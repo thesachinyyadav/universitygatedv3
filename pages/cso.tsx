@@ -46,6 +46,7 @@ export default function CSODashboard() {
   const [totalResults, setTotalResults] = useState(0);
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, revoked: 0 });
   const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [topEvents, setTopEvents] = useState<[string, number][]>([]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -140,6 +141,18 @@ export default function CSODashboard() {
         if (data.stats) {
           setStats(data.stats);
         }
+        
+        // Calculate top events by visitor count
+        const eventCounts = new Map<string, number>();
+        data.visitors?.forEach((visitor: Visitor) => {
+          if (visitor.event_name) {
+            eventCounts.set(visitor.event_name, (eventCounts.get(visitor.event_name) || 0) + 1);
+          }
+        });
+        const sortedEvents = Array.from(eventCounts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+        setTopEvents(sortedEvents);
       }
     } catch (error) {
       console.error('Error fetching visitors:', error);
@@ -258,7 +271,7 @@ export default function CSODashboard() {
 
       const csvContent = [
         headers.join(','),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+        ...rows.map((row: any[]) => row.map(cell => `"${cell}"`).join(',')),
       ].join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -681,14 +694,14 @@ export default function CSODashboard() {
         {/* All Visitors Table */}
         <div className="card overflow-x-auto">
           <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3">
-            All Visitor Records ({filteredVisitors.length})
+            All Visitor Records ({visitors.length})
           </h3>
 
           {isLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-maroon-600 mx-auto"></div>
             </div>
-          ) : filteredVisitors.length === 0 ? (
+          ) : visitors.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
               <p>No visitors found</p>
             </div>
@@ -710,7 +723,7 @@ export default function CSODashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredVisitors.map((visitor) => (
+                    {visitors.map((visitor) => (
                       <tr key={visitor.id} className="border-t hover:bg-gray-50">
                         <td className="px-2 py-2">
                           <div className="font-medium text-gray-800 text-sm">{visitor.name}</div>
@@ -791,7 +804,7 @@ export default function CSODashboard() {
 
               {/* Mobile Card View */}
               <div className="md:hidden space-y-3">
-                {filteredVisitors.map((visitor) => (
+                {visitors.map((visitor) => (
                   <div key={visitor.id} className="bg-white border-2 border-gray-100 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -881,10 +894,10 @@ export default function CSODashboard() {
                 ))}
               </div>
             </>
-          )
+          )}
 
-            {/* Pagination Controls */}
-            {!isLoading && visitors.length > 0 && (
+          {/* Pagination Controls */}
+          {!isLoading && visitors.length > 0 && (
               <div className="mt-6 px-6 py-4 bg-gray-50 border-t border-gray-200">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <p className="text-sm text-gray-600">
