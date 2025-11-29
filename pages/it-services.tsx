@@ -69,6 +69,10 @@ export default function ITServicesPage() {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [filteredVisitors, setFilteredVisitors] = useState<Visitor[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [areaStats, setAreaStats] = useState<AreaOfInterestStats[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCompanions, setEditCompanions] = useState<number>(0);
@@ -121,19 +125,23 @@ export default function ITServicesPage() {
     return () => clearInterval(intervalId);
   }, [user]);
 
+  // Server-side search with debouncing
   useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredVisitors(visitors);
-    } else {
-      const filtered = visitors.filter(
-        (v) =>
-          v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          v.phone.includes(searchTerm) ||
-          v.email?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredVisitors(filtered);
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
     }
-  }, [searchTerm, visitors]);
+
+    const timer = setTimeout(() => {
+      setCurrentPage(1); // Reset to page 1 when searching
+      fetchVisitors(1, searchTerm);
+    }, 500); // 500ms debounce
+
+    setSearchDebounceTimer(timer);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [searchTerm]);
 
   const checkUser = async () => {
     try {
@@ -151,28 +159,47 @@ export default function ITServicesPage() {
     }
   };
 
-  const fetchVisitors = async () => {
+  const fetchVisitors = async (page = currentPage, search = searchTerm) => {
     try {
       setIsRefreshing(true);
-      const { data, error } = await supabase
-        .from('visitors')
-        .select('*')
-        .order('has_arrived', { ascending: false })
-        .order('arrived_at', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setVisitors(data || []);
-      setFilteredVisitors(data || []);
+      const response = await fetch(
+        `/api/visitors-paginated?page=${page}&limit=50&search=${encodeURIComponent(search)}`
+      );
+      
+      if (!response.ok) throw new Error('Failed to fetch visitors');
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setVisitors(data.visitors || []);
+        setFilteredVisitors(data.visitors || []);
+        setTotalPages(data.pagination.totalPages);
+        setTotalResults(data.pagination.total);
+        setCurrentPage(data.pagination.page);
+        
+        // Update stats with accurate counts from API
+        if (data.stats) {
+          setStats({
+            totalRegistered: data.stats.totalRegistered,
+            totalArrived: data.stats.totalArrived,
+            companionsRegistered: 0, // Not needed for main page
+            companionsArrived: 0,
+            arrivalRate: data.stats.totalRegistered > 0 
+              ? (data.stats.totalArrived / data.stats.totalRegistered) * 100 
+              : 0,
+          });
+        }
+      }
     } catch (error) {
       console.error('Error fetching visitors:', error);
+      showToast('Failed to fetch visitors', 'error');
     } finally {
       setIsRefreshing(false);
     }
   };
 
   const handleManualRefresh = async () => {
-    await fetchVisitors();
+    await fetchVisitors(currentPage, searchTerm);
   };
 
   const fetchStats = async () => {
@@ -313,8 +340,8 @@ export default function ITServicesPage() {
       // Reset form and refresh
       setQuickRegForm({ name: '', phone: '', event_name: '', accompanying_count: 0, area_of_interest: [] });
       setShowQuickRegister(false);
-      await fetchVisitors();
-      await fetchStats();
+      setCurrentPage(1);
+      await fetchVisitors(1, searchTerm);
       showToast(`${quickRegForm.name} registered successfully!`, 'success');
     } catch (error) {
       console.error('Error in quick registration:', error);
@@ -346,8 +373,7 @@ export default function ITServicesPage() {
       setTimeout(() => setJustCheckedIn(null), 2000);
 
       // Refresh data
-      await fetchVisitors();
-      await fetchStats();
+      await fetchVisitors(currentPage, searchTerm);
       await fetchAreaStats();
 
       // Clear search field for next visitor
@@ -381,8 +407,7 @@ export default function ITServicesPage() {
       if (error) throw error;
 
       // Refresh data
-      await fetchVisitors();
-      await fetchStats();
+      await fetchVisitors(currentPage, searchTerm);
       await fetchAreaStats();
 
       // Clear search field for next visitor
@@ -423,8 +448,7 @@ export default function ITServicesPage() {
       if (error) throw error;
 
       // Refresh data
-      await fetchVisitors();
-      await fetchStats();
+      await fetchVisitors(currentPage, searchTerm);
       await fetchAreaStats();
       setEditingId(null);
       
@@ -586,14 +610,34 @@ export default function ITServicesPage() {
                       <option key={event.id} value={event.event_name}>{event.event_name}</option>
                     ))}
                   </select>
-                  <input
-                    type="number"
-                    placeholder="Companions"
-                    min="0"
-                    value={quickRegForm.accompanying_count}
-                    onChange={(e) => setQuickRegForm({ ...quickRegForm, accompanying_count: parseInt(e.target.value) || 0 })}
-                    className="px-3 py-2 bg-white border border-green-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
+                  <div className="space-y-2">
+                    <input
+                      type="number"
+                      placeholder="Companions"
+                      min="0"
+                      value={quickRegForm.accompanying_count}
+                      onChange={(e) => setQuickRegForm({ ...quickRegForm, accompanying_count: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-white border border-green-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                    <div className="flex items-center space-x-1.5">
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <motion.button
+                          key={num}
+                          type="button"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => setQuickRegForm({ ...quickRegForm, accompanying_count: num })}
+                          className={`flex-1 px-2 py-1.5 rounded-md text-sm font-semibold transition-all ${
+                            quickRegForm.accompanying_count === num
+                              ? 'bg-green-600 text-white shadow-sm'
+                              : 'bg-green-100 text-green-700 hover:bg-green-200'
+                          }`}
+                        >
+                          {num}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
                   <select
                     value={quickRegForm.area_of_interest[0] || ''}
                     onChange={(e) => setQuickRegForm({ ...quickRegForm, area_of_interest: e.target.value ? [e.target.value] : [] })}
@@ -708,12 +752,12 @@ export default function ITServicesPage() {
               <Users className="h-4 w-4 text-gray-400" />
             </div>
             <motion.p 
-              key={visitors.length}
+              key={stats?.totalRegistered || 0}
               initial={{ scale: 1.2, color: '#6366f1' }}
               animate={{ scale: 1, color: '#1f2937' }}
               className="text-3xl font-bold mt-1"
             >
-              {visitors.length}
+              {stats?.totalRegistered || 0}
             </motion.p>
           </motion.div>
           
@@ -726,12 +770,12 @@ export default function ITServicesPage() {
               <CheckCircle className="h-4 w-4 text-green-500" />
             </div>
             <motion.p 
-              key={visitors.filter(v => v.has_arrived).length}
+              key={stats?.totalArrived || 0}
               initial={{ scale: 1.2, color: '#10b981' }}
               animate={{ scale: 1, color: '#059669' }}
               className="text-3xl font-bold mt-1"
             >
-              {visitors.filter(v => v.has_arrived).length}
+              {stats?.totalArrived || 0}
             </motion.p>
           </motion.div>
           
@@ -744,12 +788,12 @@ export default function ITServicesPage() {
               <Clock className="h-4 w-4 text-amber-500" />
             </div>
             <motion.p 
-              key={visitors.filter(v => !v.has_arrived).length}
+              key={(stats?.totalRegistered || 0) - (stats?.totalArrived || 0)}
               initial={{ scale: 1.2, color: '#f59e0b' }}
               animate={{ scale: 1, color: '#d97706' }}
               className="text-3xl font-bold mt-1"
             >
-              {visitors.filter(v => !v.has_arrived).length}
+              {(stats?.totalRegistered || 0) - (stats?.totalArrived || 0)}
             </motion.p>
           </motion.div>
           
@@ -789,56 +833,57 @@ export default function ITServicesPage() {
           transition={{ delay: 0.2 }}
           className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50/80 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Visitor
-                  </th>
-                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">
-                    Phone
-                  </th>
-                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">
-                    Event
-                  </th>
-                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">
-                    Companions
-                  </th>
-                  <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">
-                    Total
-                  </th>
-                  <th className="px-4 sm:px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {filteredVisitors.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-16 text-center">
-                      <div className="flex flex-col items-center">
-                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-                          <Users className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <p className="text-gray-500 font-medium">
-                          {searchTerm ? 'No visitors found matching your search' : 'No visitors registered yet'}
-                        </p>
-                        {searchTerm && (
-                          <button
-                            onClick={() => setSearchTerm('')}
-                            className="mt-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium"
-                          >
-                            Clear search
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
+          {filteredVisitors.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                  <Users className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500 font-medium">
+                  {searchTerm ? 'No visitors found matching your search' : 'No visitors registered yet'}
+                </p>
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="mt-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                  >
+                    Clear search
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50/80 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Visitor
+                      </th>
+                      <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Phone
+                      </th>
+                      <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Event
+                      </th>
+                      <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">
+                        Companions
+                      </th>
+                      <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">
+                        Total
+                      </th>
+                      <th className="px-4 sm:px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {(
                   filteredVisitors.map((visitor, index) => (
                     <motion.tr 
                       key={visitor.id}
@@ -986,17 +1031,229 @@ export default function ITServicesPage() {
                       </td>
                     </motion.tr>
                   ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3 p-4">
+              {filteredVisitors.map((visitor, index) => (
+                <motion.div
+                  key={visitor.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.02 }}
+                  className={`bg-white border-2 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${
+                    justCheckedIn === visitor.id 
+                      ? 'border-green-500 bg-green-50/30' 
+                      : 'border-gray-100'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-3 flex-1">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-semibold shadow-md ${
+                        visitor.has_arrived 
+                          ? 'bg-gradient-to-br from-green-400 to-green-600' 
+                          : 'bg-gradient-to-br from-gray-300 to-gray-400'
+                      }`}>
+                        {visitor.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-gray-900 text-base truncate">{visitor.name}</h4>
+                        <p className="text-xs text-gray-500 truncate">{visitor.phone}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-sm mb-4">
+                    <div className="flex items-center">
+                      <span className="text-gray-500 w-24 flex-shrink-0">Event:</span>
+                      <span className="text-gray-800 text-xs font-medium bg-gray-100 px-2 py-1 rounded">{visitor.event_name}</span>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <span className="text-gray-500 w-24 flex-shrink-0">Status:</span>
+                      {visitor.has_arrived ? (
+                        <div className="flex flex-col">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-green-50 text-green-700 text-xs font-semibold w-fit">
+                            <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                            Arrived
+                          </span>
+                          <span className="text-xs text-gray-600 mt-1">
+                            {new Date(visitor.arrived_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-semibold">
+                          <Clock className="h-3.5 w-3.5 mr-1" />
+                          Pending
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center">
+                      <span className="text-gray-500 w-24 flex-shrink-0">Companions:</span>
+                      {editingId === visitor.id ? (
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            min="0"
+                            value={editCompanions}
+                            onChange={(e) => setEditCompanions(parseInt(e.target.value) || 0)}
+                            className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-center text-sm focus:ring-2 focus:ring-indigo-500"
+                            disabled={processingId === visitor.id}
+                          />
+                          <button
+                            onClick={() => saveCompanions(visitor.id, visitor.name)}
+                            disabled={processingId === visitor.id}
+                            className="min-h-[36px] min-w-[36px] rounded-lg bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center disabled:opacity-50"
+                          >
+                            <Save className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            disabled={processingId === visitor.id}
+                            className="min-h-[36px] min-w-[36px] rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center disabled:opacity-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">{visitor.accompanying_count}</span>
+                          <span className="text-gray-400">•</span>
+                          <span className="text-xs text-gray-600">Total: {visitor.accompanying_count + 1}</span>
+                          <button
+                            onClick={() => startEdit(visitor)}
+                            className="min-h-[32px] min-w-[32px] rounded-lg bg-gray-100 text-gray-500 hover:bg-indigo-100 hover:text-indigo-600 flex items-center justify-center"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {!visitor.has_arrived ? (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleCheckIn(visitor)}
+                      disabled={processingId === visitor.id}
+                      className="w-full min-h-[48px] flex items-center justify-center bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-3 rounded-xl font-medium transition-all disabled:opacity-50 shadow-sm hover:shadow-lg space-x-2 touch-manipulation"
+                    >
+                      {processingId === visitor.id ? (
+                        <>
+                          <RefreshCw className="h-5 w-5 animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="h-5 w-5" />
+                          <span>Check In</span>
+                        </>
+                      )}
+                    </motion.button>
+                  ) : (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleUndoCheckIn(visitor)}
+                      disabled={processingId === visitor.id}
+                      className="w-full min-h-[48px] flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 space-x-2 touch-manipulation"
+                    >
+                      <Undo className="h-4 w-4" />
+                      <span>Undo Check-In</span>
+                    </motion.button>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </>
+          )}
           
-          {/* Table Footer */}
+          {/* Table Footer with Pagination */}
           {filteredVisitors.length > 0 && (
             <div className="px-4 sm:px-6 py-4 bg-gray-50/50 border-t border-gray-100">
-              <p className="text-xs text-gray-500">
-                Showing {filteredVisitors.length} of {visitors.length} visitors
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <p className="text-sm text-gray-600">
+                  Showing <span className="font-semibold">{(currentPage - 1) * 50 + 1}</span> to{' '}
+                  <span className="font-semibold">{Math.min(currentPage * 50, totalResults)}</span> of{' '}
+                  <span className="font-semibold">{totalResults}</span>{' '}
+                  {searchTerm ? 'matching ' : ''}visitors
+                  {searchTerm && (
+                    <span className="text-gray-500"> (Total: {stats?.totalRegistered || 0})</span>
+                  )}
+                </p>
+                
+                {totalPages > 1 && (
+                  <div className="flex items-center space-x-2">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        const newPage = currentPage - 1;
+                        setCurrentPage(newPage);
+                        fetchVisitors(newPage, searchTerm);
+                      }}
+                      disabled={currentPage === 1 || isRefreshing}
+                      className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </motion.button>
+                    
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <motion.button
+                            key={pageNum}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              setCurrentPage(pageNum);
+                              fetchVisitors(pageNum, searchTerm);
+                            }}
+                            disabled={isRefreshing}
+                            className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                              currentPage === pageNum
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {pageNum}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                    
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        const newPage = currentPage + 1;
+                        setCurrentPage(newPage);
+                        fetchVisitors(newPage, searchTerm);
+                      }}
+                      disabled={currentPage === totalPages || isRefreshing}
+                      className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </motion.button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </motion.div>

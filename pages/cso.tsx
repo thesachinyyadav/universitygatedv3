@@ -40,6 +40,12 @@ export default function CSODashboard() {
   const [rejectionReason, setRejectionReason] = useState<{ [key: string]: string }>({});
   const [activeTab, setActiveTab] = useState<'events' | 'visitors'>('events');
   const [selectedEventFilter, setSelectedEventFilter] = useState<string>('');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, revoked: 0 });
+  const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -53,10 +59,28 @@ export default function CSODashboard() {
       return;
     }
     setUser(parsedUser);
-    fetchVisitors();
+    fetchVisitors(1, '', '', '');
     fetchEventRequests();
     fetchNotifications(parsedUser.id);
   }, [router]);
+
+  // Server-side search with debouncing
+  useEffect(() => {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
+
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+      fetchVisitors(1, searchTerm, selectedStatusFilter, selectedEventFilter);
+    }, 500);
+
+    setSearchDebounceTimer(timer);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [searchTerm, selectedStatusFilter, selectedEventFilter]);
 
   const fetchEventRequests = async () => {
     try {
@@ -89,11 +113,34 @@ export default function CSODashboard() {
     }
   };
 
-  const fetchVisitors = async () => {
+  const fetchVisitors = async (page = currentPage, search = searchTerm, statusFilter = selectedStatusFilter, eventFilter = selectedEventFilter) => {
     try {
-      const response = await fetch('/api/visitors');
+      setIsLoading(true);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '50',
+        search: search,
+        status_filter: statusFilter,
+        event_filter: eventFilter,
+      });
+      
+      const response = await fetch(`/api/cso-visitors-paginated?${params}`);
+      
+      if (!response.ok) throw new Error('Failed to fetch visitors');
+      
       const data = await response.json();
-      setVisitors(data.visitors || []);
+      
+      if (data.success) {
+        setVisitors(data.visitors || []);
+        setTotalPages(data.pagination.totalPages);
+        setTotalResults(data.pagination.total);
+        setCurrentPage(data.pagination.page);
+        
+        // Update stats with accurate counts from API
+        if (data.stats) {
+          setStats(data.stats);
+        }
+      }
     } catch (error) {
       console.error('Error fetching visitors:', error);
     } finally {
@@ -115,7 +162,7 @@ export default function CSODashboard() {
       });
 
       if (response.ok) {
-        fetchVisitors();
+        fetchVisitors(currentPage, searchTerm, selectedStatusFilter, selectedEventFilter);
       }
     } catch (error) {
       console.error('Error updating status:', error);
@@ -176,45 +223,59 @@ export default function CSODashboard() {
     }
   };
 
-  const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'Event', 'Date', 'Status', 'Created'];
-    const rows = visitors.map(v => [
-      v.name,
-      v.email || '',
-      v.phone || '',
-      v.event_name || '',
-      (v.date_of_visit && v.date_of_visit !== '') 
-        ? new Date(v.date_of_visit).toLocaleDateString() 
-        : (v.date_of_visit_from && v.date_of_visit_to) 
-          ? `${new Date(v.date_of_visit_from).toLocaleDateString()} - ${new Date(v.date_of_visit_to).toLocaleDateString()}` 
-          : 'N/A',
-      v.status,
-      new Date(v.created_at).toLocaleString(),
-    ]);
+  const exportToCSV = async () => {
+    try {
+      // Fetch ALL visitors from API for CSV export (no pagination)
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '50000', // Large limit to get all visitors
+        search: searchTerm,
+        status_filter: selectedStatusFilter,
+        event_filter: selectedEventFilter,
+      });
+      
+      const response = await fetch(`/api/cso-visitors-paginated?${params}`);
+      const data = await response.json();
+      
+      if (!data.success) throw new Error('Failed to fetch visitors for export');
+      
+      const allVisitors = data.visitors || [];
+      
+      const headers = ['Name', 'Email', 'Phone', 'Event', 'Date', 'Status', 'Created'];
+      const rows = allVisitors.map((v: any) => [
+        v.name,
+        v.email || '',
+        v.phone || '',
+        v.event_name || '',
+        (v.date_of_visit && v.date_of_visit !== '') 
+          ? new Date(v.date_of_visit).toLocaleDateString() 
+          : (v.date_of_visit_from && v.date_of_visit_to) 
+            ? `${new Date(v.date_of_visit_from).toLocaleDateString()} - ${new Date(v.date_of_visit_to).toLocaleDateString()}` 
+            : 'N/A',
+        v.status,
+        new Date(v.created_at).toLocaleString(),
+      ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
-    ].join('\n');
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+      ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `visitors-export-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `visitors-export-${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Failed to export CSV. Please try again.');
+    }
   };
 
   if (!user) {
     return null;
   }
-
-  const stats = {
-    total: visitors.length,
-    pending: visitors.filter(v => v.status === 'pending').length,
-    approved: visitors.filter(v => v.status === 'approved').length,
-    revoked: visitors.filter(v => v.status === 'revoked').length,
-  };
 
   const eventRequestStats = {
     pending: eventRequests.filter(r => r.status === 'pending').length,
@@ -224,28 +285,6 @@ export default function CSODashboard() {
 
   // Count actual pending requests, not unread notifications
   const pendingRequestsCount = eventRequestStats.pending;
-
-  // Event analytics
-  const eventStats = visitors.reduce((acc, v) => {
-    if (v.event_name) {
-      acc[v.event_name] = (acc[v.event_name] || 0) + 1;
-    }
-    return acc;
-  }, {} as Record<string, number>);
-
-  const topEvents = Object.entries(eventStats)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
-
-  const filteredVisitors = visitors.filter(v => {
-    const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.event_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesEvent = !selectedEventFilter || v.event_name === selectedEventFilter;
-    
-    return matchesSearch && matchesEvent;
-  });
 
   return (
     <div className="min-h-screen bg-gray-50 py-3 sm:py-4 md:py-6 px-3 sm:px-4">
@@ -535,51 +574,107 @@ export default function CSODashboard() {
           )}
         </div>
 
-        {/* Search and Export */}
+        {/* Search, Filters and Export */}
         <div className="card mb-4 sm:mb-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 gap-3">
-            <div className="flex-1 max-w-md">
-              <input
-                type="text"
-                placeholder="Search by name, email, or event..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input-field"
-              />
-            </div>
-            {selectedEventFilter && (
-              <div className="flex items-center space-x-2 bg-primary-100 text-primary-800 px-3 py-2 rounded-lg">
-                <span className="text-sm font-medium">Filtered by: {selectedEventFilter}</span>
-                <button
-                  onClick={() => setSelectedEventFilter('')}
-                  className="text-primary-600 hover:text-primary-800 font-bold"
+          <div className="flex flex-col space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 gap-3">
+              <div className="flex-1 max-w-md">
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or event..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <select
+                  value={selectedStatusFilter}
+                  onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                  className="input-field text-sm px-3 py-2"
                 >
-                  ✕
+                  <option value="">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="revoked">Revoked</option>
+                </select>
+                
+                <button
+                  onClick={() => {
+                    setCurrentPage(1);
+                    fetchVisitors(1, searchTerm, selectedStatusFilter, selectedEventFilter);
+                  }}
+                  disabled={isLoading}
+                  className="btn-secondary whitespace-nowrap flex items-center space-x-2 disabled:opacity-50"
+                  title="Refresh visitor data"
+                >
+                  <svg className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+                
+                <button
+                  onClick={exportToCSV}
+                  className="btn-secondary whitespace-nowrap flex items-center space-x-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Export CSV</span>
+                </button>
+              </div>
+            </div>
+            
+            {(selectedEventFilter || searchTerm || selectedStatusFilter) && (
+              <div className="flex items-center space-x-2 text-sm">
+                <span className="text-gray-600">Active filters:</span>
+                {searchTerm && (
+                  <div className="flex items-center space-x-1 bg-indigo-100 text-indigo-800 px-3 py-1 rounded-lg">
+                    <span className="font-medium">Search: "{searchTerm}"</span>
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="text-indigo-600 hover:text-indigo-800 font-bold ml-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                {selectedStatusFilter && (
+                  <div className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-lg">
+                    <span className="font-medium">Status: {selectedStatusFilter}</span>
+                    <button
+                      onClick={() => setSelectedStatusFilter('')}
+                      className="text-blue-600 hover:text-blue-800 font-bold ml-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                {selectedEventFilter && (
+                  <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-3 py-1 rounded-lg">
+                    <span className="font-medium">Event: {selectedEventFilter}</span>
+                    <button
+                      onClick={() => setSelectedEventFilter('')}
+                      className="text-green-600 hover:text-green-800 font-bold ml-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedStatusFilter('');
+                    setSelectedEventFilter('');
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-sm underline"
+                >
+                  Clear all
                 </button>
               </div>
             )}
-            <button
-              onClick={() => {
-                setIsLoading(true);
-                fetchVisitors();
-              }}
-              className="btn-secondary whitespace-nowrap flex items-center space-x-2"
-              title="Refresh visitor data"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span>Refresh</span>
-            </button>
-            <button
-              onClick={exportToCSV}
-              className="btn-secondary whitespace-nowrap flex items-center space-x-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span>Export to CSV</span>
-            </button>
           </div>
         </div>
 
@@ -598,99 +693,279 @@ export default function CSODashboard() {
               <p>No visitors found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Name</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Event</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Verified By</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Verified At</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Contact</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Visit Date</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Status</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredVisitors.map((visitor) => (
-                    <tr key={visitor.id} className="border-t hover:bg-gray-50">
-                      <td className="px-2 py-2">
-                        <div className="font-medium text-gray-800 text-sm">{visitor.name}</div>
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Name</th>
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Event</th>
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Verified By</th>
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Verified At</th>
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Contact</th>
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Visit Date</th>
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Status</th>
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredVisitors.map((visitor) => (
+                      <tr key={visitor.id} className="border-t hover:bg-gray-50">
+                        <td className="px-2 py-2">
+                          <div className="font-medium text-gray-800 text-sm">{visitor.name}</div>
+                          {visitor.register_number && (
+                            <div className="text-xs text-gray-500">ID: {visitor.register_number}</div>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-gray-700 text-sm max-w-[150px] truncate">{visitor.event_name || 'N/A'}</td>
+                        <td className="px-2 py-2">
+                          {visitor.verified_by ? (
+                            <div className="flex items-center space-x-1">
+                              <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span className="text-sm font-medium text-gray-700">{visitor.verified_by}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">Not verified</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-xs text-gray-600 whitespace-nowrap">
+                          {visitor.verified_at 
+                            ? new Date(visitor.verified_at).toLocaleString('en-IN', { 
+                                day: 'numeric', 
+                                month: 'short', 
+                                year: 'numeric',
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })
+                            : '-'}
+                        </td>
+                        <td className="px-2 py-2">
+                          <div className="text-xs text-gray-600">
+                            {visitor.email && <div className="truncate max-w-[150px]">{visitor.email}</div>}
+                            {visitor.phone && <div>{visitor.phone}</div>}
+                            {!visitor.email && !visitor.phone && <span className="text-gray-400">N/A</span>}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2 text-gray-700 text-xs whitespace-nowrap">
+                          {(visitor.date_of_visit && visitor.date_of_visit !== '') 
+                            ? new Date(visitor.date_of_visit).toLocaleDateString() 
+                            : (visitor.date_of_visit_from && visitor.date_of_visit_to) 
+                              ? `${new Date(visitor.date_of_visit_from).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - ${new Date(visitor.date_of_visit_to).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` 
+                              : 'N/A'}
+                        </td>
+                        <td className="px-2 py-2">
+                          <span className={`badge-${visitor.status} text-xs px-2 py-1`}>
+                            {visitor.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2">
+                          <div className="flex space-x-1">
+                            {visitor.status !== 'approved' && (
+                              <button
+                                onClick={() => updateStatus(visitor.id, 'approved')}
+                                className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
+                                title="Approve"
+                              >
+                                ✓
+                              </button>
+                            )}
+                            {visitor.status !== 'revoked' && (
+                              <button
+                                onClick={() => updateStatus(visitor.id, 'revoked')}
+                                className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                                title="Revoke"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-3">
+                {filteredVisitors.map((visitor) => (
+                  <div key={visitor.id} className="bg-white border-2 border-gray-100 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 text-base mb-1">{visitor.name}</h4>
                         {visitor.register_number && (
-                          <div className="text-xs text-gray-500">ID: {visitor.register_number}</div>
+                          <p className="text-xs text-gray-500 mb-2">ID: {visitor.register_number}</p>
                         )}
-                      </td>
-                      <td className="px-2 py-2 text-gray-700 text-sm max-w-[150px] truncate">{visitor.event_name || 'N/A'}</td>
-                      <td className="px-2 py-2">
-                        {visitor.verified_by ? (
+                        <span className={`badge-${visitor.status} text-xs px-2 py-1 inline-block`}>
+                          {visitor.status.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-start">
+                        <span className="text-gray-500 w-24 flex-shrink-0">Event:</span>
+                        <span className="text-gray-800 font-medium">{visitor.event_name || 'N/A'}</span>
+                      </div>
+                      
+                      {visitor.verified_by && (
+                        <div className="flex items-start">
+                          <span className="text-gray-500 w-24 flex-shrink-0">Verified By:</span>
                           <div className="flex items-center space-x-1">
                             <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span className="text-sm font-medium text-gray-700">{visitor.verified_by}</span>
+                            <span className="text-gray-800">{visitor.verified_by}</span>
                           </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">Not verified</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-xs text-gray-600 whitespace-nowrap">
-                        {visitor.verified_at 
-                          ? new Date(visitor.verified_at).toLocaleString('en-IN', { 
+                        </div>
+                      )}
+                      
+                      {visitor.verified_at && (
+                        <div className="flex items-start">
+                          <span className="text-gray-500 w-24 flex-shrink-0">Verified At:</span>
+                          <span className="text-gray-700 text-xs">
+                            {new Date(visitor.verified_at).toLocaleString('en-IN', { 
                               day: 'numeric', 
                               month: 'short', 
-                              year: 'numeric',
                               hour: '2-digit', 
                               minute: '2-digit' 
-                            })
-                          : '-'}
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="text-xs text-gray-600">
-                          {visitor.email && <div className="truncate max-w-[150px]">{visitor.email}</div>}
-                          {visitor.phone && <div>{visitor.phone}</div>}
-                          {!visitor.email && !visitor.phone && <span className="text-gray-400">N/A</span>}
+                            })}
+                          </span>
                         </div>
-                      </td>
-                      <td className="px-2 py-2 text-gray-700 text-xs whitespace-nowrap">
-                        {(visitor.date_of_visit && visitor.date_of_visit !== '') 
-                          ? new Date(visitor.date_of_visit).toLocaleDateString() 
-                          : (visitor.date_of_visit_from && visitor.date_of_visit_to) 
-                            ? `${new Date(visitor.date_of_visit_from).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - ${new Date(visitor.date_of_visit_to).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` 
-                            : 'N/A'}
-                      </td>
-                      <td className="px-2 py-2">
-                        <span className={`badge-${visitor.status} text-xs px-2 py-1`}>
-                          {visitor.status.toUpperCase()}
+                      )}
+                      
+                      {(visitor.email || visitor.phone) && (
+                        <div className="flex items-start">
+                          <span className="text-gray-500 w-24 flex-shrink-0">Contact:</span>
+                          <div className="text-gray-700 text-xs">
+                            {visitor.email && <div className="break-words">{visitor.email}</div>}
+                            {visitor.phone && <div>{visitor.phone}</div>}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-start">
+                        <span className="text-gray-500 w-24 flex-shrink-0">Visit Date:</span>
+                        <span className="text-gray-700 text-xs">
+                          {(visitor.date_of_visit && visitor.date_of_visit !== '') 
+                            ? new Date(visitor.date_of_visit).toLocaleDateString() 
+                            : (visitor.date_of_visit_from && visitor.date_of_visit_to) 
+                              ? `${new Date(visitor.date_of_visit_from).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - ${new Date(visitor.date_of_visit_to).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` 
+                              : 'N/A'}
                         </span>
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="flex space-x-1">
-                          {visitor.status !== 'approved' && (
-                            <button
-                              onClick={() => updateStatus(visitor.id, 'approved')}
-                              className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
-                              title="Approve"
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-2 mt-4 pt-3 border-t border-gray-100">
+                      {visitor.status !== 'approved' && (
+                        <button
+                          onClick={() => updateStatus(visitor.id, 'approved')}
+                          className="flex-1 min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm touch-manipulation"
+                        >
+                          ✓ Approve
+                        </button>
+                      )}
+                      {visitor.status !== 'revoked' && (
+                        <button
+                          onClick={() => updateStatus(visitor.id, 'revoked')}
+                          className="flex-1 min-h-[44px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm touch-manipulation"
+                        >
+                          ✕ Revoke
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )
+
+            {/* Pagination Controls */}
+            {!isLoading && visitors.length > 0 && (
+              <div className="mt-6 px-6 py-4 bg-gray-50 border-t border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <p className="text-sm text-gray-600">
+                    Showing <span className="font-semibold">{(currentPage - 1) * 50 + 1}</span> to{' '}
+                    <span className="font-semibold">{Math.min(currentPage * 50, totalResults)}</span> of{' '}
+                    <span className="font-semibold">{totalResults}</span>{' '}
+                    {(searchTerm || selectedStatusFilter || selectedEventFilter) ? 'matching ' : ''}visitors
+                    {(searchTerm || selectedStatusFilter || selectedEventFilter) && (
+                      <span className="text-gray-500"> (Total: {stats.total})</span>
+                    )}
+                  </p>
+                  
+                  {totalPages > 1 && (
+                    <div className="flex items-center space-x-2">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          const newPage = currentPage - 1;
+                          setCurrentPage(newPage);
+                          fetchVisitors(newPage, searchTerm, selectedStatusFilter, selectedEventFilter);
+                        }}
+                        disabled={currentPage === 1 || isLoading}
+                        className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </motion.button>
+                      
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <motion.button
+                              key={pageNum}
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => {
+                                setCurrentPage(pageNum);
+                                fetchVisitors(pageNum, searchTerm, selectedStatusFilter, selectedEventFilter);
+                              }}
+                              disabled={isLoading}
+                              className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                                currentPage === pageNum
+                                  ? 'bg-indigo-600 text-white shadow-sm'
+                                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
-                              ✓
-                            </button>
-                          )}
-                          {visitor.status !== 'revoked' && (
-                            <button
-                              onClick={() => updateStatus(visitor.id, 'revoked')}
-                              className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
-                              title="Revoke"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                              {pageNum}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                      
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          const newPage = currentPage + 1;
+                          setCurrentPage(newPage);
+                          fetchVisitors(newPage, searchTerm, selectedStatusFilter, selectedEventFilter);
+                        }}
+                        disabled={currentPage === totalPages || isLoading}
+                        className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </motion.button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           )}
         </div>
           </>

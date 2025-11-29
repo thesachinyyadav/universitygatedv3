@@ -215,6 +215,12 @@ html {
   }
 }
 
+/* Touch Manipulation - Remove 300ms tap delay */
+button, a, input, select, textarea, [role="button"], [onclick] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
 /* Mobile-first touch targets */
 @media (max-width: 768px) {
   button, a {
@@ -229,6 +235,8 @@ html {
   input[type="checkbox"],
   input[type="radio"] {
     @apply w-6 h-6;
+    min-width: 44px;
+    min-height: 44px;
   }
   
   /* Ensure inputs are easily tappable on mobile */
@@ -241,6 +249,14 @@ html {
   textarea {
     font-size: 16px !important; /* Prevents iOS zoom */
     min-height: 48px;
+  }
+  
+  /* Better table overflow handling on mobile */
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

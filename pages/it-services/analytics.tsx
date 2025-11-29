@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { supabase } from '../../lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, TrendingUp, CheckCircle, UserCheck, Target, ArrowLeft, Sparkles, Calendar, Clock, Download } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
@@ -88,32 +87,12 @@ export default function AnalyticsPage() {
 
   const fetchStats = async () => {
     try {
-      const { data: visitors, error } = await supabase
-        .from('visitors')
-        .select('has_arrived, accompanying_count');
-
-      if (error) throw error;
+      // Use optimized API endpoint instead of fetching all rows
+      const response = await fetch('/api/analytics-stats');
+      const data = await response.json();
       
-      if (visitors) {
-        const arrived = visitors.filter(v => v.has_arrived);
-        const totalRegistered = visitors.length;
-        const totalArrived = arrived.length;
-        
-        // Calculate total footfall (visitors + companions)
-        const totalFootfallRegistered = visitors.reduce((sum, v) => 
-          sum + 1 + (v.accompanying_count || 0), 0
-        );
-        const totalFootfallArrived = arrived.reduce((sum, v) => 
-          sum + 1 + (v.accompanying_count || 0), 0
-        );
-        
-        setStats({
-          totalRegistered,
-          totalArrived,
-          totalFootfallRegistered,
-          totalFootfallArrived,
-          arrivalRate: totalRegistered > 0 ? Math.round((totalArrived / totalRegistered) * 100) : 0,
-        });
+      if (data.success && data.stats) {
+        setStats(data.stats);
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -122,61 +101,13 @@ export default function AnalyticsPage() {
 
   const fetchAreaStats = async () => {
     try {
-      const { data, error } = await supabase
-        .from('visitors')
-        .select('area_of_interest, has_arrived, accompanying_count');
-
-      if (error) throw error;
-
-      // Group by area of interest (handling multiple interests per visitor)
-      // Count = (1 registered + companions) for EACH area they selected
-      const areaMap = new Map<string, { total: number; arrived: number }>();
+      // Use optimized API endpoint
+      const response = await fetch('/api/analytics-areas');
+      const data = await response.json();
       
-      data?.forEach((visitor) => {
-        let interests: string[] = [];
-        
-        // Calculate total people for this visitor (1 + companions)
-        const peopleCount = 1 + (visitor.accompanying_count || 0);
-        
-        // Parse area_of_interest - could be string, array, or JSON string
-        try {
-          if (typeof visitor.area_of_interest === 'string') {
-            // Try to parse as JSON array first
-            const parsed = JSON.parse(visitor.area_of_interest);
-            interests = Array.isArray(parsed) ? parsed : [visitor.area_of_interest];
-          } else if (Array.isArray(visitor.area_of_interest)) {
-            interests = visitor.area_of_interest;
-          } else {
-            interests = ['Not Specified'];
-          }
-        } catch {
-          // If JSON parse fails, treat as single string
-          interests = visitor.area_of_interest ? [visitor.area_of_interest] : ['Not Specified'];
-        }
-
-        // Count this visitor + companions for each of their selected interests
-        interests.forEach((area) => {
-          if (!areaMap.has(area)) {
-            areaMap.set(area, { total: 0, arrived: 0 });
-          }
-          const stats = areaMap.get(area)!;
-          stats.total += peopleCount; // Add all people (registered + companions)
-          if (visitor.has_arrived) {
-            stats.arrived += peopleCount; // Add all people who arrived
-          }
-        });
-      });
-
-      // Convert to array and sort by total
-      const areaStatsArray = Array.from(areaMap.entries())
-        .map(([area, stats]) => ({
-          area,
-          total: stats.total,
-          arrived: stats.arrived,
-        }))
-        .sort((a, b) => b.total - a.total);
-
-      setAreaStats(areaStatsArray);
+      if (data.success && data.areas) {
+        setAreaStats(data.areas);
+      }
     } catch (error) {
       console.error('Error fetching area stats:', error);
     }
@@ -184,44 +115,13 @@ export default function AnalyticsPage() {
 
   const fetchDayWiseStats = async () => {
     try {
-      const { data, error } = await supabase
-        .from('visitors')
-        .select('arrived_at, has_arrived, accompanying_count')
-        .eq('has_arrived', true)
-        .order('arrived_at', { ascending: true });
-
-      if (error) throw error;
-
-      // Group by date
-      const dateMap = new Map<string, { visitors: number; footfall: number }>();
+      // Use optimized API endpoint
+      const response = await fetch('/api/analytics-daywise');
+      const data = await response.json();
       
-      data?.forEach((visitor) => {
-        if (visitor.arrived_at) {
-          const date = new Date(visitor.arrived_at).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          });
-          
-          if (!dateMap.has(date)) {
-            dateMap.set(date, { visitors: 0, footfall: 0 });
-          }
-          
-          const stats = dateMap.get(date)!;
-          stats.visitors += 1;
-          stats.footfall += 1 + (visitor.accompanying_count || 0);
-        }
-      });
-
-      // Convert to array
-      const dayWiseArray = Array.from(dateMap.entries())
-        .map(([date, stats]) => ({
-          date,
-          visitors: stats.visitors,
-          footfall: stats.footfall,
-        }));
-
-      setDayWiseStats(dayWiseArray);
+      if (data.success && data.days) {
+        setDayWiseStats(data.days);
+      }
     } catch (error) {
       console.error('Error fetching day-wise stats:', error);
     }
@@ -289,10 +189,10 @@ export default function AnalyticsPage() {
       }
 
       // Sheet 4: Visitor Details with Area of Interest
-      const { data: visitorsData } = await supabase
-        .from('visitors')
-        .select('name, phone, email, event_name, visitor_category, area_of_interest, accompanying_count, has_arrived, arrived_at, created_at')
-        .order('created_at', { ascending: false });
+      // Use optimized export endpoint
+      const exportResponse = await fetch('/api/visitors-export');
+      const exportData = await exportResponse.json();
+      const visitorsData = exportData.success ? exportData.visitors : [];
 
       if (visitorsData && visitorsData.length > 0) {
         const visitorDetailsData = [

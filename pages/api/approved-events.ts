@@ -45,8 +45,8 @@ export default async function handler(
 
     console.log('[APPROVED_EVENTS] Found:', availableEvents.length, 'events');
 
-    // Cache for 30 seconds, stale-while-revalidate for 60 seconds
-    res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    // Moderate cache for events list
+    res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
 
     return res.status(200).json({ 
       events: availableEvents,

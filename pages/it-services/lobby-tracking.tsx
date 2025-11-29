@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Users, Clock, Send, UserPlus, Trash2, ChevronDown, ChevronUp, Sparkles, TrendingUp, AlertCircle, Pencil, Check, X } from 'lucide-react';
-import { useLobbyStatus, useBatchHistory, invalidateCache } from '@/lib/hooks/useSWRCache';
+import { useLobbyStatus } from '@/lib/hooks/useSWRCache';
 import { useToast } from '@/components/ui/Toast';
 
 interface LobbyData {
@@ -36,14 +36,6 @@ export default function RoomTracking() {
   const [selectedLobby, setSelectedLobby] = useState<string>('Lobby 1');
   const [loading, setLoading] = useState(true);
   
-  // Use SWR for data fetching with caching
-  const { data: lobbyData, error: lobbyError, mutate: refreshLobbies } = useLobbyStatus(5000);
-  const { data: historyData, error: historyError, mutate: refreshHistory } = useBatchHistory(selectedLobby, 5000);
-  
-  const lobbies: LobbyData[] = lobbyData?.lobbies || [];
-  const batchHistory: BatchHistory[] = historyData?.batches || [];
-  const loadingHistory = !historyData && !historyError;
-  
   // Batch exit form state
   const [showBatchForm, setShowBatchForm] = useState(false);
   const [batchForm, setBatchForm] = useState({
@@ -58,10 +50,30 @@ export default function RoomTracking() {
   const [editingLobby, setEditingLobby] = useState<string | null>(null);
   const [editCount, setEditCount] = useState<number>(0);
   const [isUpdatingCount, setIsUpdatingCount] = useState(false);
+  
+  // Batch history pagination state
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyData, setHistoryData] = useState<any>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Use SWR for data fetching with caching
+  const { data: lobbyData, error: lobbyError, mutate: refreshLobbies } = useLobbyStatus(5000);
+  
+  const lobbies: LobbyData[] = lobbyData?.lobbies || [];
+  const batchHistory: BatchHistory[] = historyData?.batches || [];
+  const totalPages = historyData?.pagination?.totalPages || 1;
+  const totalBatches = historyData?.pagination?.total || 0;
 
   useEffect(() => {
     checkUser();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchBatchHistory(historyPage);
+    }
+  }, [selectedLobby, historyPage, selectedDate, user]);
 
   const checkUser = () => {
     try {
@@ -76,6 +88,23 @@ export default function RoomTracking() {
       router.push('/login');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBatchHistory = async (page: number) => {
+    setLoadingHistory(true);
+    try {
+      const response = await fetch(
+        `/api/lobby/batch-history?lobby_name=${selectedLobby}&page=${page}&limit=10&date=${selectedDate}`
+      );
+      const data = await response.json();
+      if (data.success) {
+        setHistoryData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching batch history:', error);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -130,9 +159,10 @@ export default function RoomTracking() {
       setVolunteers([{ name: '', register_number: '' }]);
       setShowBatchForm(false);
       
-      // Refresh data using SWR mutate
+      // Refresh data
       await refreshLobbies();
-      await refreshHistory();
+      setHistoryPage(1);
+      await fetchBatchHistory(1);
       
       showToast(`Batch #${data.batch.batch_number} created successfully!`, 'success');
     } catch (error: any) {
@@ -638,116 +668,408 @@ export default function RoomTracking() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-xl p-8"
+          className="bg-white rounded-xl shadow-xl overflow-hidden"
         >
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Batch History - {selectedLobby}</h2>
-          
-          {loadingHistory ? (
-            <p className="text-gray-600">Loading history...</p>
-          ) : batchHistory.length === 0 ? (
-            <p className="text-gray-600">No batches sent out yet.</p>
-          ) : (
-            <div className="space-y-6">
-              {(() => {
-                // Group batches by date
-                const batchesByDate = batchHistory.reduce((acc, batch) => {
-                  const date = new Date(batch.created_at).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  });
-                  if (!acc[date]) acc[date] = [];
-                  acc[date].push(batch);
-                  return acc;
-                }, {} as Record<string, BatchHistory[]>);
+          <div className="bg-gradient-to-r from-slate-700 to-slate-900 px-8 py-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-lg flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Batch History</h2>
+                  <p className="text-slate-200 text-sm">{selectedLobby} • {selectedDate === new Date().toISOString().split('T')[0] ? "Today's" : new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} Batches</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <label className="text-white text-sm font-medium">Date:</label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value);
+                      setHistoryPage(1);
+                    }}
+                    className="px-3 py-2 bg-white/10 backdrop-blur border border-white/30 rounded-lg text-white text-sm focus:ring-2 focus:ring-white/50 focus:border-white/50 transition-all"
+                  />
+                  {selectedDate !== new Date().toISOString().split('T')[0] && (
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        setSelectedDate(new Date().toISOString().split('T')[0]);
+                        setHistoryPage(1);
+                      }}
+                      className="px-3 py-2 bg-white/20 hover:bg-white/30 backdrop-blur text-white text-sm rounded-lg transition-colors font-medium"
+                    >
+                      Today
+                    </motion.button>
+                  )}
+                </div>
+                
+                {totalBatches > 0 && (
+                  <div className="bg-white/20 backdrop-blur px-4 py-2 rounded-lg">
+                    <p className="text-white font-bold text-lg">{totalBatches}</p>
+                    <p className="text-slate-200 text-xs">Total Batches</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
-                return Object.entries(batchesByDate).map(([date, batches]) => (
-                  <div key={date}>
-                    <div className="flex items-center space-x-3 mb-3">
-                      <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                        <Clock className="w-4 h-4 text-indigo-600" />
-                      </div>
-                      <h3 className="font-bold text-gray-800">{date}</h3>
-                      <div className="flex-1 h-px bg-gray-200"></div>
-                      <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                        {batches.length} {batches.length === 1 ? 'batch' : 'batches'}
-                      </span>
-                    </div>
-                    <div className="space-y-3 ml-11">
-                      {batches.map((batch) => (
-                        <div
-                          key={batch.id}
-                          className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                        >
-                          <div
-                            className="flex items-center justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100"
-                            onClick={() => setExpandedBatch(expandedBatch === batch.id ? null : batch.id)}
+          <div className="p-8">
+            {loadingHistory ? (
+              <div className="flex items-center justify-center py-12">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-8 h-8 border-4 border-slate-200 border-t-slate-600 rounded-full"
+                />
+                <p className="ml-3 text-gray-600">Loading batches...</p>
+              </div>
+            ) : batchHistory.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Send className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-gray-600 font-medium">No batches sent out yet</p>
+                <p className="text-gray-400 text-sm mt-1">Create your first batch above</p>
+              </div>
+            ) : (
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b-2 border-gray-200">
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Batch #</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Time</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">People</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Volunteers</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Notes</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Created By</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700 text-sm">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batchHistory.map((batch, index) => (
+                        <React.Fragment key={batch.id}>
+                          <motion.tr
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                              expandedBatch === batch.id ? 'bg-blue-50' : ''
+                            }`}
                           >
-                            <div className="flex items-center space-x-4">
-                              <div className="w-12 h-12 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                                #{batch.batch_number}
+                            <td className="py-4 px-4">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                                  #{batch.batch_number}
+                                </div>
                               </div>
-                              <div>
-                                <p className="font-semibold text-gray-900">
-                                  {batch.people_count} {batch.people_count === 1 ? 'person' : 'people'}
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  {new Date(batch.created_at).toLocaleTimeString('en-US', { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
-                                  })}
-                                  {batch.notes && ` • ${batch.notes}`}
-                                </p>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {new Date(batch.created_at).toLocaleTimeString('en-US', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit',
+                                  hour12: true
+                                })}
                               </div>
-                            </div>
-                            <div className="flex items-center space-x-3">
-                              <span className="text-sm text-gray-500">
-                                {batch.volunteers.length} {batch.volunteers.length === 1 ? 'volunteer' : 'volunteers'}
-                              </span>
-                              {expandedBatch === batch.id ? (
-                                <ChevronUp className="w-5 h-5 text-gray-400" />
-                              ) : (
-                                <ChevronDown className="w-5 h-5 text-gray-400" />
-                              )}
-                            </div>
-                          </div>
-                          
+                              <div className="text-xs text-gray-500">
+                                {new Date(batch.created_at).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric' 
+                                })}
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="flex items-center space-x-2">
+                                <Users className="w-4 h-4 text-blue-600" />
+                                <span className="font-semibold text-gray-900">{batch.people_count}</span>
+                                <span className="text-gray-500 text-sm">
+                                  {batch.people_count === 1 ? 'person' : 'people'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="inline-flex items-center space-x-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
+                                <UserPlus className="w-3.5 h-3.5" />
+                                <span>{batch.volunteers.length}</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <p className="text-sm text-gray-700 max-w-xs truncate">
+                                {batch.notes || <span className="text-gray-400 italic">No notes</span>}
+                              </p>
+                            </td>
+                            <td className="py-4 px-4">
+                              <p className="text-sm text-gray-600">
+                                {batch.created_by_username || 'Unknown'}
+                              </p>
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setExpandedBatch(expandedBatch === batch.id ? null : batch.id)}
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+                              >
+                                {expandedBatch === batch.id ? (
+                                  <ChevronUp className="w-4 h-4" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4" />
+                                )}
+                              </motion.button>
+                            </td>
+                          </motion.tr>
                           <AnimatePresence>
                             {expandedBatch === batch.id && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                className="border-t border-gray-200 bg-white p-4"
+                              <motion.tr
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
                               >
-                                <p className="text-sm font-semibold text-gray-700 mb-3">Volunteers:</p>
-                                <div className="space-y-2">
-                                  {batch.volunteers.map((vol, idx) => (
-                                    <div key={idx} className="flex items-center justify-between bg-indigo-50 p-3 rounded-lg">
-                                      <span className="font-medium text-gray-900">{vol.name}</span>
-                                      <span className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full">
-                                        {vol.register_number}
-                                      </span>
+                                <td colSpan={7} className="bg-blue-50/50 px-4 py-0">
+                                  <motion.div
+                                    initial={{ height: 0 }}
+                                    animate={{ height: 'auto' }}
+                                    exit={{ height: 0 }}
+                                    className="overflow-hidden"
+                                  >
+                                    <div className="py-4 px-4">
+                                      <div className="flex items-center space-x-2 mb-3">
+                                        <UserPlus className="w-4 h-4 text-blue-600" />
+                                        <p className="text-sm font-semibold text-gray-800">Volunteer Details:</p>
+                                      </div>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {batch.volunteers.map((vol, idx) => (
+                                          <motion.div
+                                            key={idx}
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: idx * 0.05 }}
+                                            className="flex items-center justify-between bg-white border border-blue-200 p-3 rounded-lg shadow-sm"
+                                          >
+                                            <div className="flex items-center space-x-3">
+                                              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                                {vol.name.charAt(0).toUpperCase()}
+                                              </div>
+                                              <span className="font-medium text-gray-900">{vol.name}</span>
+                                            </div>
+                                            <span className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full font-medium">
+                                              {vol.register_number}
+                                            </span>
+                                          </motion.div>
+                                        ))}
+                                      </div>
                                     </div>
-                                  ))}
-                                </div>
-                                {batch.created_by_username && (
-                                  <p className="text-xs text-gray-500 mt-3">
-                                    Created by: {batch.created_by_username}
-                                  </p>
-                                )}
-                              </motion.div>
+                                  </motion.div>
+                                </td>
+                              </motion.tr>
                             )}
                           </AnimatePresence>
-                        </div>
+                        </React.Fragment>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-4">
+                  {batchHistory.map((batch, index) => (
+                    <motion.div
+                      key={batch.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="bg-white border-2 border-gray-100 rounded-xl p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl flex items-center justify-center text-white font-bold shadow-sm">
+                            #{batch.batch_number}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900">
+                              {new Date(batch.created_at).toLocaleTimeString('en-US', { 
+                                hour: '2-digit', 
+                                minute: '2-digit',
+                                hour12: true
+                              })}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {new Date(batch.created_at).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 text-sm mb-4">
+                        <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                          <span className="text-gray-500">People:</span>
+                          <div className="flex items-center space-x-2">
+                            <Users className="w-4 h-4 text-blue-600" />
+                            <span className="font-semibold text-gray-900">{batch.people_count}</span>
+                            <span className="text-gray-500 text-xs">
+                              {batch.people_count === 1 ? 'person' : 'people'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                          <span className="text-gray-500">Volunteers:</span>
+                          <span className="inline-flex items-center space-x-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>{batch.volunteers.length}</span>
+                          </span>
+                        </div>
+
+                        {batch.notes && (
+                          <div className="flex items-start py-2 border-b border-gray-100">
+                            <span className="text-gray-500 w-24 flex-shrink-0">Notes:</span>
+                            <p className="text-gray-700 flex-1 break-words">{batch.notes}</p>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between py-2">
+                          <span className="text-gray-500">Created By:</span>
+                          <span className="text-gray-800 font-medium">{batch.created_by_username || 'Unknown'}</span>
+                        </div>
+                      </div>
+
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setExpandedBatch(expandedBatch === batch.id ? null : batch.id)}
+                        className="w-full min-h-[44px] flex items-center justify-center space-x-2 bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-3 rounded-lg font-medium transition-colors touch-manipulation"
+                      >
+                        {expandedBatch === batch.id ? (
+                          <>
+                            <ChevronUp className="w-5 h-5" />
+                            <span>Hide Volunteer Details</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-5 h-5" />
+                            <span>Show Volunteer Details</span>
+                          </>
+                        )}
+                      </motion.button>
+
+                      <AnimatePresence>
+                        {expandedBatch === batch.id && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <p className="text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                                <UserPlus className="w-4 h-4 text-blue-600 mr-2" />
+                                Volunteer Details:
+                              </p>
+                              <div className="space-y-2">
+                                {batch.volunteers.map((vol, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between bg-blue-50 border border-blue-200 p-3 rounded-lg"
+                                  >
+                                    <div className="flex items-center space-x-3">
+                                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                        {vol.name.charAt(0).toUpperCase()}
+                                      </div>
+                                      <span className="font-medium text-gray-900 text-sm">{vol.name}</span>
+                                    </div>
+                                    <span className="text-xs text-blue-600 bg-blue-100 px-3 py-1 rounded-full font-medium">
+                                      {vol.register_number}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-gray-200 pt-6">
+                    <p className="text-sm text-gray-600 text-center sm:text-left">
+                      Page <span className="font-semibold">{historyPage}</span> of{' '}
+                      <span className="font-semibold">{totalPages}</span>
+                      <span className="text-gray-400 ml-2 hidden sm:inline">({totalBatches} total batches)</span>
+                    </p>
+                    <div className="flex items-center space-x-2">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setHistoryPage(historyPage - 1)}
+                        disabled={historyPage === 1 || loadingHistory}
+                        className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </motion.button>
+                      
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (historyPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (historyPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = historyPage - 2 + i;
+                          }
+                          
+                          return (
+                            <motion.button
+                              key={pageNum}
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => setHistoryPage(pageNum)}
+                              disabled={loadingHistory}
+                              className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                                historyPage === pageNum
+                                  ? 'bg-blue-600 text-white shadow-md'
+                                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              {pageNum}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                      
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setHistoryPage(historyPage + 1)}
+                        disabled={historyPage === totalPages || loadingHistory}
+                        className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </motion.button>
                     </div>
                   </div>
-                ));
-              })()}
-            </div>
-          )}
+                )}
+              </>
+            )}
+          </div>
         </motion.div>
       </div>
 
