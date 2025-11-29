@@ -199,7 +199,7 @@ export default function AnalyticsPage() {
           ['Visitor Details with Area of Interest'],
           [],
           ['Name', 'Phone', 'Email', 'Event', 'Category', 'Area of Interest', 'Companions', 'Total People', 'Status', 'Arrival Time', 'Registration Date'],
-          ...visitorsData.map(visitor => {
+          ...visitorsData.map((visitor: any) => {
             let areaOfInterest = '';
             try {
               if (typeof visitor.area_of_interest === 'string') {
