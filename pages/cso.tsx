@@ -979,10 +979,9 @@ export default function CSODashboard() {
                 </div>
               </div>
             )}
-          )}
         </div>
-          </>
-        )}
+        </>
+      )}
       </div>
 
       {/* Powered by Socio */}
